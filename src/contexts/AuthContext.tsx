@@ -28,6 +28,8 @@ const demoUser: AppUser = {
   isActive: true,
 };
 
+const ADMIN_EMAIL = 'pit.ecommerce@gmail.com';
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AppUser | null>(IS_DEMO ? demoUser : null);
   const [loading, setLoading] = useState(!IS_DEMO);
@@ -39,9 +41,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     async function initFirebase() {
       const { auth } = await import('@/services/firebase');
-      const { onAuthStateChanged } = await import('firebase/auth');
+      const { onAuthStateChanged, getRedirectResult } = await import('firebase/auth');
       const { doc, getDoc, setDoc } = await import('firebase/firestore');
       const { db } = await import('@/services/firebase');
+
+      // Process Google redirect result (no-op if not returning from redirect)
+      getRedirectResult(auth).catch(() => {});
 
       onAuthStateChanged(auth, async (fbUser) => {
         if (cancelled) return;
@@ -58,11 +63,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             } as AppUser);
           } else {
             const now = new Date().toISOString();
+            const isAdmin = fbUser.email === ADMIN_EMAIL;
             const newUser: Omit<AppUser, 'uid'> = {
               email: fbUser.email || '',
               displayName: fbUser.displayName || fbUser.email || 'Usuario',
-              role: 'admin',
-              modules: ['crm', 'wms'],
+              role: isAdmin ? 'admin' : 'sales_agent',
+              modules: isAdmin ? ['crm', 'wms'] : ['crm'],
               teamId: fbUser.uid,
               createdAt: now,
               updatedAt: now,
@@ -122,11 +128,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     const { auth } = await import('@/services/firebase');
-    const { GoogleAuthProvider, signInWithPopup } = await import('firebase/auth');
+    const { GoogleAuthProvider, signInWithRedirect } = await import('firebase/auth');
 
     const provider = new GoogleAuthProvider();
-    await signInWithPopup(auth, provider);
-    // onAuthStateChanged will auto-create Firestore doc if missing
+    await signInWithRedirect(auth, provider);
+    // After redirect back, onAuthStateChanged will fire and auto-create Firestore doc if missing
   };
 
   const signUp = async (email: string, password: string, name: string) => {
