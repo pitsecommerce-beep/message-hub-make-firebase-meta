@@ -48,7 +48,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (fbUser) {
           const userDoc = await getDoc(doc(db, 'users', fbUser.uid));
           if (userDoc.exists()) {
-            setUser({ uid: fbUser.uid, ...userDoc.data() } as AppUser);
+            const data = userDoc.data();
+            setUser({
+              uid: fbUser.uid,
+              modules: [],
+              role: 'admin',
+              ...data,
+            } as AppUser);
           }
         } else {
           setUser(null);
@@ -178,7 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hasModule = (module: ModuleAccess) => {
     if (!user) return false;
     if (user.role === 'admin') return true;
-    return user.modules.includes(module);
+    return Array.isArray(user.modules) && user.modules.includes(module);
   };
 
   const hasRole = (roles: UserRole[]) => {
