@@ -58,6 +58,7 @@ function AppRoutes() {
         <Route path="/admin" element={<RoleRoute roles={['admin']}><AdminPage /></RoleRoute>} />
         <Route path="/settings" element={<RoleRoute roles={['admin', 'manager']}><SettingsPage /></RoleRoute>} />
       </Route>
+      <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
