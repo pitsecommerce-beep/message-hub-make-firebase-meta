@@ -5,6 +5,7 @@ interface AuthContextType {
   user: AppUser | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   signUp: (email: string, password: string, name: string) => Promise<void>;
   signOut: () => Promise<void>;
   hasModule: (module: ModuleAccess) => boolean;
@@ -68,6 +69,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { auth } = await import('@/services/firebase');
     const { signInWithEmailAndPassword } = await import('firebase/auth');
     await signInWithEmailAndPassword(auth, email, password);
+  };
+
+  const signInWithGoogle = async () => {
+    if (IS_DEMO) {
+      setUser(demoUser);
+      return;
+    }
+    const { auth, db } = await import('@/services/firebase');
+    const { GoogleAuthProvider, signInWithPopup } = await import('firebase/auth');
+    const { doc, getDoc, setDoc } = await import('firebase/firestore');
+
+    const provider = new GoogleAuthProvider();
+    const cred = await signInWithPopup(auth, provider);
+    const fbUser = cred.user;
+
+    const userDoc = await getDoc(doc(db, 'users', fbUser.uid));
+    if (!userDoc.exists()) {
+      const now = new Date().toISOString();
+      const newUser: Omit<AppUser, 'uid'> = {
+        email: fbUser.email || '',
+        displayName: fbUser.displayName || 'Usuario',
+        role: 'admin',
+        modules: ['crm', 'wms'],
+        teamId: fbUser.uid,
+        createdAt: now,
+        updatedAt: now,
+        isActive: true,
+      };
+      await setDoc(doc(db, 'users', fbUser.uid), newUser);
+      await setDoc(doc(db, 'teams', fbUser.uid), {
+        id: fbUser.uid,
+        name: `${fbUser.displayName || 'Mi'} Team`,
+        ownerId: fbUser.uid,
+        createdAt: now,
+        settings: {
+          primaryColor: '#1a85e6',
+          aiProviders: [],
+          businessHours: {
+            timezone: 'America/Mexico_City',
+            schedule: Object.fromEntries(
+              ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'].map(d => [
+                d,
+                { enabled: d !== 'sunday', start: '09:00', end: '18:00' },
+              ])
+            ),
+          },
+          metaConfig: {},
+        },
+      });
+    }
   };
 
   const signUp = async (email: string, password: string, name: string) => {
@@ -141,6 +192,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         loading,
         signIn,
+        signInWithGoogle,
         signUp,
         signOut: signOutFn,
         hasModule,
