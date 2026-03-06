@@ -40,13 +40,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async function initFirebase() {
       const { auth } = await import('@/services/firebase');
       const { onAuthStateChanged } = await import('firebase/auth');
-      const { doc, getDoc } = await import('firebase/firestore');
+      const { doc, getDoc, setDoc } = await import('firebase/firestore');
       const { db } = await import('@/services/firebase');
 
       onAuthStateChanged(auth, async (fbUser) => {
         if (cancelled) return;
         if (fbUser) {
-          const userDoc = await getDoc(doc(db, 'users', fbUser.uid));
+          const userRef = doc(db, 'users', fbUser.uid);
+          const userDoc = await getDoc(userRef);
           if (userDoc.exists()) {
             const data = userDoc.data();
             setUser({
@@ -55,6 +56,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               modules: data.modules || [],
               role: data.role || 'admin',
             } as AppUser);
+          } else {
+            const now = new Date().toISOString();
+            const newUser: Omit<AppUser, 'uid'> = {
+              email: fbUser.email || '',
+              displayName: fbUser.displayName || fbUser.email || 'Usuario',
+              role: 'admin',
+              modules: ['crm', 'wms'],
+              teamId: fbUser.uid,
+              createdAt: now,
+              updatedAt: now,
+              isActive: true,
+            };
+            await setDoc(userRef, newUser);
+            const teamRef = doc(db, 'teams', fbUser.uid);
+            const teamDoc = await getDoc(teamRef);
+            if (!teamDoc.exists()) {
+              await setDoc(teamRef, {
+                id: fbUser.uid,
+                name: `${fbUser.displayName || 'Mi'} Team`,
+                ownerId: fbUser.uid,
+                createdAt: now,
+                settings: {
+                  primaryColor: '#1a85e6',
+                  aiProviders: [],
+                  businessHours: {
+                    timezone: 'America/Mexico_City',
+                    schedule: Object.fromEntries(
+                      ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'].map(d => [
+                        d,
+                        { enabled: d !== 'sunday', start: '09:00', end: '18:00' },
+                      ])
+                    ),
+                  },
+                  metaConfig: {},
+                },
+              });
+            }
+            setUser({ uid: fbUser.uid, ...newUser });
           }
         } else {
           setUser(null);
@@ -82,49 +121,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(demoUser);
       return;
     }
-    const { auth, db } = await import('@/services/firebase');
+    const { auth } = await import('@/services/firebase');
     const { GoogleAuthProvider, signInWithPopup } = await import('firebase/auth');
-    const { doc, getDoc, setDoc } = await import('firebase/firestore');
 
     const provider = new GoogleAuthProvider();
-    const cred = await signInWithPopup(auth, provider);
-    const fbUser = cred.user;
-
-    const userDoc = await getDoc(doc(db, 'users', fbUser.uid));
-    if (!userDoc.exists()) {
-      const now = new Date().toISOString();
-      const newUser: Omit<AppUser, 'uid'> = {
-        email: fbUser.email || '',
-        displayName: fbUser.displayName || 'Usuario',
-        role: 'admin',
-        modules: ['crm', 'wms'],
-        teamId: fbUser.uid,
-        createdAt: now,
-        updatedAt: now,
-        isActive: true,
-      };
-      await setDoc(doc(db, 'users', fbUser.uid), newUser);
-      await setDoc(doc(db, 'teams', fbUser.uid), {
-        id: fbUser.uid,
-        name: `${fbUser.displayName || 'Mi'} Team`,
-        ownerId: fbUser.uid,
-        createdAt: now,
-        settings: {
-          primaryColor: '#1a85e6',
-          aiProviders: [],
-          businessHours: {
-            timezone: 'America/Mexico_City',
-            schedule: Object.fromEntries(
-              ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'].map(d => [
-                d,
-                { enabled: d !== 'sunday', start: '09:00', end: '18:00' },
-              ])
-            ),
-          },
-          metaConfig: {},
-        },
-      });
-    }
+    await signInWithPopup(auth, provider);
+    // onAuthStateChanged will auto-create Firestore doc if missing
   };
 
   const signUp = async (email: string, password: string, name: string) => {
@@ -132,44 +134,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser({ ...demoUser, displayName: name, email });
       return;
     }
-    const { auth, db } = await import('@/services/firebase');
-    const { createUserWithEmailAndPassword } = await import('firebase/auth');
-    const { doc, setDoc } = await import('firebase/firestore');
+    const { auth } = await import('@/services/firebase');
+    const { createUserWithEmailAndPassword, signInWithEmailAndPassword } = await import('firebase/auth');
 
-    const cred = await createUserWithEmailAndPassword(auth, email, password);
-    const now = new Date().toISOString();
-    const newUser: Omit<AppUser, 'uid'> = {
-      email,
-      displayName: name,
-      role: 'admin',
-      modules: ['crm', 'wms'],
-      teamId: cred.user.uid,
-      createdAt: now,
-      updatedAt: now,
-      isActive: true,
-    };
-    await setDoc(doc(db, 'users', cred.user.uid), newUser);
-    await setDoc(doc(db, 'teams', cred.user.uid), {
-      id: cred.user.uid,
-      name: `${name}'s Team`,
-      ownerId: cred.user.uid,
-      createdAt: now,
-      settings: {
-        primaryColor: '#1a85e6',
-        aiProviders: [],
-        businessHours: {
-          timezone: 'America/Mexico_City',
-          schedule: Object.fromEntries(
-            ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'].map(d => [
-              d,
-              { enabled: d !== 'sunday', start: '09:00', end: '18:00' },
-            ])
-          ),
-        },
-        metaConfig: {},
-      },
-    });
-    setUser({ uid: cred.user.uid, ...newUser });
+    try {
+      await createUserWithEmailAndPassword(auth, email, password);
+      // onAuthStateChanged will auto-create the Firestore doc
+    } catch (err: unknown) {
+      const code = (err as { code?: string }).code;
+      if (code === 'auth/email-already-in-use') {
+        // User exists in Auth (maybe orphaned), just sign in
+        // onAuthStateChanged will auto-create Firestore doc if missing
+        await signInWithEmailAndPassword(auth, email, password);
+      } else {
+        throw err;
+      }
+    }
   };
 
   const signOutFn = async () => {
