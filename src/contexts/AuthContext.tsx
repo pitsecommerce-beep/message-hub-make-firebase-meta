@@ -4,9 +4,9 @@ import type { AppUser, UserRole, ModuleAccess } from '@/types';
 interface AuthContextType {
   user: AppUser | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
-  signUp: (email: string, password: string, name: string) => Promise<void>;
+  signUp: (email: string, password: string, name: string, role: UserRole, orgCode?: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   hasModule: (module: ModuleAccess) => boolean;
   hasRole: (roles: UserRole[]) => boolean;
@@ -14,29 +14,25 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const IS_DEMO = !import.meta.env.VITE_FIREBASE_API_KEY;
-
-const demoUser: AppUser = {
-  uid: 'demo-admin',
-  email: 'admin@demo.com',
-  displayName: 'Admin Demo',
-  role: 'admin',
-  modules: ['crm', 'wms'],
-  teamId: 'demo-team',
-  createdAt: '2026-01-01T00:00:00Z',
-  updatedAt: '2026-03-06T00:00:00Z',
-  isActive: true,
-};
-
 const ADMIN_EMAIL = 'pit.ecommerce@gmail.com';
 
+function generateOrgCode(): string {
+  return Math.random().toString(36).substring(2, 8).toUpperCase();
+}
+
+function getRoleModules(role: UserRole): ModuleAccess[] {
+  switch (role) {
+    case 'manager': return ['crm', 'wms'];
+    case 'sales_agent': return ['crm'];
+    case 'warehouse': return ['wms'];
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AppUser | null>(IS_DEMO ? demoUser : null);
-  const [loading, setLoading] = useState(!IS_DEMO);
+  const [user, setUser] = useState<AppUser | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (IS_DEMO) return;
-
     let cancelled = false;
 
     async function initFirebase() {
@@ -45,7 +41,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { doc, getDoc, setDoc } = await import('firebase/firestore');
       const { db } = await import('@/services/firebase');
 
-      // Process Google redirect result (no-op if not returning from redirect)
       getRedirectResult(auth).catch(() => {});
 
       onAuthStateChanged(auth, async (fbUser) => {
@@ -59,16 +54,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               ...data,
               uid: fbUser.uid,
               modules: data.modules || [],
-              role: data.role || 'admin',
+              role: data.role || 'sales_agent',
             } as AppUser);
           } else {
+            // Auto-create for Google sign-in or orphaned auth
+            const isManager = fbUser.email === ADMIN_EMAIL;
+            const role: UserRole = isManager ? 'manager' : 'sales_agent';
             const now = new Date().toISOString();
-            const isAdmin = fbUser.email === ADMIN_EMAIL;
+            const orgCode = generateOrgCode();
             const newUser: Omit<AppUser, 'uid'> = {
               email: fbUser.email || '',
               displayName: fbUser.displayName || fbUser.email || 'Usuario',
-              role: isAdmin ? 'admin' : 'sales_agent',
-              modules: isAdmin ? ['crm', 'wms'] : ['crm'],
+              role,
+              modules: getRoleModules(role),
               teamId: fbUser.uid,
               createdAt: now,
               updatedAt: now,
@@ -82,6 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 id: fbUser.uid,
                 name: `${fbUser.displayName || 'Mi'} Team`,
                 ownerId: fbUser.uid,
+                orgCode,
                 createdAt: now,
                 settings: {
                   primaryColor: '#1a85e6',
@@ -96,6 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     ),
                   },
                   metaConfig: {},
+                  channelConnections: [],
                 },
               });
             }
@@ -112,64 +112,129 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true; };
   }, []);
 
-  const signIn = async (email: string, password: string) => {
-    if (IS_DEMO) {
-      setUser(demoUser);
-      return;
+  const signInWithGoogle = async () => {
+    const { auth } = await import('@/services/firebase');
+    const { GoogleAuthProvider, signInWithRedirect } = await import('firebase/auth');
+    const provider = new GoogleAuthProvider();
+    await signInWithRedirect(auth, provider);
+  };
+
+  const signUp = async (email: string, password: string, name: string, role: UserRole, orgCode?: string) => {
+    const { auth } = await import('@/services/firebase');
+    const { createUserWithEmailAndPassword, signInWithEmailAndPassword } = await import('firebase/auth');
+    const { doc, setDoc, getDoc, collection, query, where, getDocs } = await import('firebase/firestore');
+    const { db } = await import('@/services/firebase');
+
+    let teamId: string;
+    const now = new Date().toISOString();
+
+    if (role === 'manager') {
+      // Manager creates their own team
+      let cred;
+      try {
+        cred = await createUserWithEmailAndPassword(auth, email, password);
+      } catch (err: unknown) {
+        if ((err as { code?: string }).code === 'auth/email-already-in-use') {
+          cred = await signInWithEmailAndPassword(auth, email, password);
+        } else {
+          throw err;
+        }
+      }
+      teamId = cred.user.uid;
+      const code = generateOrgCode();
+
+      const userRef = doc(db, 'users', cred.user.uid);
+      const existingUser = await getDoc(userRef);
+      if (!existingUser.exists()) {
+        await setDoc(userRef, {
+          email,
+          displayName: name,
+          role: 'manager',
+          modules: ['crm', 'wms'],
+          teamId,
+          createdAt: now,
+          updatedAt: now,
+          isActive: true,
+        });
+        await setDoc(doc(db, 'teams', teamId), {
+          id: teamId,
+          name: `${name} Team`,
+          ownerId: cred.user.uid,
+          orgCode: code,
+          createdAt: now,
+          settings: {
+            primaryColor: '#1a85e6',
+            aiProviders: [],
+            businessHours: {
+              timezone: 'America/Mexico_City',
+              schedule: Object.fromEntries(
+                ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'].map(d => [
+                  d,
+                  { enabled: d !== 'sunday', start: '09:00', end: '18:00' },
+                ])
+              ),
+            },
+            metaConfig: {},
+            channelConnections: [],
+          },
+        });
+      }
+    } else {
+      // Employee joins existing team via org code
+      if (!orgCode) throw new Error('Se requiere un código de organización');
+
+      // Find team by org code
+      const teamsRef = collection(db, 'teams');
+      const q = query(teamsRef, where('orgCode', '==', orgCode.toUpperCase()));
+      const snap = await getDocs(q);
+      if (snap.empty) throw new Error('Código de organización no válido');
+
+      const teamDoc = snap.docs[0];
+      teamId = teamDoc.id;
+
+      let cred;
+      try {
+        cred = await createUserWithEmailAndPassword(auth, email, password);
+      } catch (err: unknown) {
+        if ((err as { code?: string }).code === 'auth/email-already-in-use') {
+          cred = await signInWithEmailAndPassword(auth, email, password);
+        } else {
+          throw err;
+        }
+      }
+
+      const userRef = doc(db, 'users', cred.user.uid);
+      const existingUser = await getDoc(userRef);
+      if (!existingUser.exists()) {
+        await setDoc(userRef, {
+          email,
+          displayName: name,
+          role,
+          modules: getRoleModules(role),
+          teamId,
+          createdAt: now,
+          updatedAt: now,
+          isActive: true,
+        });
+      }
     }
+  };
+
+  const signIn = async (email: string, password: string) => {
     const { auth } = await import('@/services/firebase');
     const { signInWithEmailAndPassword } = await import('firebase/auth');
     await signInWithEmailAndPassword(auth, email, password);
   };
 
-  const signInWithGoogle = async () => {
-    if (IS_DEMO) {
-      setUser(demoUser);
-      return;
-    }
-    const { auth } = await import('@/services/firebase');
-    const { GoogleAuthProvider, signInWithRedirect } = await import('firebase/auth');
-
-    const provider = new GoogleAuthProvider();
-    await signInWithRedirect(auth, provider);
-    // After redirect back, onAuthStateChanged will fire and auto-create Firestore doc if missing
-  };
-
-  const signUp = async (email: string, password: string, name: string) => {
-    if (IS_DEMO) {
-      setUser({ ...demoUser, displayName: name, email });
-      return;
-    }
-    const { auth } = await import('@/services/firebase');
-    const { createUserWithEmailAndPassword, signInWithEmailAndPassword } = await import('firebase/auth');
-
-    try {
-      await createUserWithEmailAndPassword(auth, email, password);
-      // onAuthStateChanged will auto-create the Firestore doc
-    } catch (err: unknown) {
-      const code = (err as { code?: string }).code;
-      if (code === 'auth/email-already-in-use') {
-        // User exists in Auth (maybe orphaned), just sign in
-        // onAuthStateChanged will auto-create Firestore doc if missing
-        await signInWithEmailAndPassword(auth, email, password);
-      } else {
-        throw err;
-      }
-    }
-  };
-
   const signOutFn = async () => {
-    if (!IS_DEMO) {
-      const { auth } = await import('@/services/firebase');
-      const { signOut: firebaseSignOut } = await import('firebase/auth');
-      await firebaseSignOut(auth);
-    }
+    const { auth } = await import('@/services/firebase');
+    const { signOut: firebaseSignOut } = await import('firebase/auth');
+    await firebaseSignOut(auth);
     setUser(null);
   };
 
   const hasModule = (module: ModuleAccess) => {
     if (!user) return false;
-    if (user.role === 'admin') return true;
     return Array.isArray(user.modules) && user.modules.includes(module);
   };
 

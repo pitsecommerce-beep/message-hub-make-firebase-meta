@@ -157,3 +157,10 @@ export async function getTeamInvites(teamId: string): Promise<TeamInvite[]> {
   const snap = await getDocs(q);
   return snap.docs.map(d => ({ id: d.id, ...d.data() }) as TeamInvite);
 }
+
+// Org code lookup
+export async function getTeamByOrgCode(orgCode: string): Promise<Team | null> {
+  const q = query(collection(db, 'teams'), where('orgCode', '==', orgCode));
+  const snap = await getDocs(q);
+  return snap.empty ? null : ({ id: snap.docs[0].id, ...snap.docs[0].data() } as Team);
+}
