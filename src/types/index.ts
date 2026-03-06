@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'manager' | 'sales_agent' | 'warehouse';
+export type UserRole = 'manager' | 'sales_agent' | 'warehouse';
 
 export type ModuleAccess = 'crm' | 'wms';
 
@@ -19,6 +19,7 @@ export interface Team {
   id: string;
   name: string;
   ownerId: string;
+  orgCode: string;
   createdAt: string;
   settings: TeamSettings;
 }
@@ -29,6 +30,7 @@ export interface TeamSettings {
   aiProviders: AIProviderConfig[];
   businessHours: BusinessHours;
   metaConfig: MetaConfig;
+  channelConnections: ChannelConnection[];
 }
 
 export interface BusinessHours {
@@ -53,11 +55,13 @@ export interface DaySchedule {
 }
 
 export interface MetaConfig {
-  yCloudApiKey?: string;
   whatsappBusinessId?: string;
   phoneNumberId?: string;
+  accessToken?: string;
   webhookVerifyToken?: string;
-  makeWebhookUrl?: string;
+  makeScenarioUrl?: string;
+  makeWebhookInbound?: string;
+  makeWebhookOutbound?: string;
 }
 
 export type MessagePlatform = 'whatsapp' | 'messenger' | 'instagram';
@@ -190,6 +194,17 @@ export interface AIAgent {
   temperature: number;
   createdAt: string;
   updatedAt: string;
+  connectedChannels?: MessagePlatform[];
+}
+
+export interface ChannelConnection {
+  id: string;
+  platform: MessagePlatform;
+  agentId?: string;
+  isActive: boolean;
+  makeWebhookUrl?: string;
+  pageId?: string;
+  pageName?: string;
 }
 
 export interface TeamInvite {

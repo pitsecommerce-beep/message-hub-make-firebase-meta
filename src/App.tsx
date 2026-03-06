@@ -10,6 +10,7 @@ import AIAgentsPage from '@/pages/crm/AIAgentsPage';
 import WarehousePage from '@/pages/wms/WarehousePage';
 import AdminPage from '@/pages/admin/AdminPage';
 import SettingsPage from '@/pages/admin/SettingsPage';
+import ConnectionsPage from '@/pages/crm/ConnectionsPage';
 import type { ReactNode } from 'react';
 import type { ModuleAccess, UserRole } from '@/types';
 
@@ -54,9 +55,10 @@ function AppRoutes() {
         <Route path="/contacts" element={<ModuleRoute module="crm"><ContactsPage /></ModuleRoute>} />
         <Route path="/orders" element={<ModuleRoute module="crm"><OrdersPage /></ModuleRoute>} />
         <Route path="/ai-agents" element={<ModuleRoute module="crm"><AIAgentsPage /></ModuleRoute>} />
+        <Route path="/connections" element={<ModuleRoute module="crm"><ConnectionsPage /></ModuleRoute>} />
         <Route path="/warehouse" element={<ModuleRoute module="wms"><WarehousePage /></ModuleRoute>} />
-        <Route path="/admin" element={<RoleRoute roles={['admin']}><AdminPage /></RoleRoute>} />
-        <Route path="/settings" element={<RoleRoute roles={['admin', 'manager']}><SettingsPage /></RoleRoute>} />
+        <Route path="/team" element={<RoleRoute roles={['manager']}><AdminPage /></RoleRoute>} />
+        <Route path="/settings" element={<RoleRoute roles={['manager']}><SettingsPage /></RoleRoute>} />
       </Route>
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
@@ -67,7 +69,7 @@ function AppRoutes() {
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <BrowserRouter basename="/message-hub-make-firebase-meta">
         <AppRoutes />
       </BrowserRouter>
     </AuthProvider>

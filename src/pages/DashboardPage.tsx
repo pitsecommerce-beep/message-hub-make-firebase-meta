@@ -1,46 +1,89 @@
-import {
-  MessageSquare,
-  Users,
-  ShoppingCart,
-  TrendingUp,
-  ArrowUpRight,
-  Bot,
-  Package,
-} from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { MessageSquare, Users, ShoppingCart, TrendingUp, ArrowUpRight, Bot, Package, Copy, Check } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { demoConversations, demoContacts, demoOrders } from '@/utils/demo-data';
-import { formatCurrency } from '@/utils/helpers';
+import { getContacts, getConversations, getOrders, getAIAgents, getTeam } from '@/services/firestore';
+import { formatCurrency, getOrderStatusLabel } from '@/utils/helpers';
 import PageHeader from '@/components/shared/PageHeader';
+import type { Contact, Conversation, Order, AIAgent, Team } from '@/types';
 
 export default function DashboardPage() {
   const { user, hasModule } = useAuth();
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [agents, setAgents] = useState<AIAgent[]>([]);
+  const [team, setTeam] = useState<Team | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const openConvos = demoConversations.filter(c => c.status === 'open').length;
-  const totalContacts = demoContacts.length;
-  const pendingOrders = demoOrders.filter(o => ['new', 'confirmed', 'processing'].includes(o.status)).length;
-  const totalRevenue = demoOrders.filter(o => o.status !== 'cancelled' && o.status !== 'returned').reduce((s, o) => s + o.total, 0);
+  useEffect(() => {
+    if (!user?.teamId) return;
+    const tid = user.teamId;
+    Promise.all([
+      hasModule('crm') ? getConversations(tid).catch(() => []) : [],
+      hasModule('crm') ? getContacts(tid).catch(() => []) : [],
+      getOrders(tid).catch(() => []),
+      hasModule('crm') ? getAIAgents(tid).catch(() => []) : [],
+      getTeam(tid).catch(() => null),
+    ]).then(([c, ct, o, a, t]) => {
+      setConversations(c as Conversation[]);
+      setContacts(ct as Contact[]);
+      setOrders(o as Order[]);
+      setAgents(a as AIAgent[]);
+      setTeam(t as Team | null);
+      setLoading(false);
+    });
+  }, [user?.teamId]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  const openConvos = conversations.filter(c => c.status === 'open').length;
+  const pendingOrders = orders.filter(o => ['new', 'confirmed', 'processing'].includes(o.status)).length;
+  const totalRevenue = orders.filter(o => o.status !== 'cancelled' && o.status !== 'returned').reduce((s, o) => s + (o.total || 0), 0);
 
   const stats = [
     { label: 'Conversaciones abiertas', value: openConvos, icon: <MessageSquare size={20} />, color: 'text-primary-600 bg-primary-50', show: hasModule('crm') },
-    { label: 'Contactos totales', value: totalContacts, icon: <Users size={20} />, color: 'text-emerald-600 bg-emerald-50', show: hasModule('crm') },
+    { label: 'Contactos totales', value: contacts.length, icon: <Users size={20} />, color: 'text-emerald-600 bg-emerald-50', show: hasModule('crm') },
     { label: 'Pedidos pendientes', value: pendingOrders, icon: <ShoppingCart size={20} />, color: 'text-amber-600 bg-amber-50', show: true },
     { label: 'Ingresos totales', value: formatCurrency(totalRevenue), icon: <TrendingUp size={20} />, color: 'text-violet-600 bg-violet-50', show: hasModule('crm') },
   ].filter(s => s.show);
 
+  const handleCopyOrgCode = () => {
+    if (team?.orgCode) {
+      navigator.clipboard.writeText(team.orgCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      <PageHeader
-        title={`Bienvenido, ${user?.displayName?.split(' ')[0] || 'Usuario'}`}
-        subtitle="Aquí tienes un resumen de tu actividad"
-      />
+      <PageHeader title={`Bienvenido, ${user?.displayName?.split(' ')[0] || 'Usuario'}`} subtitle="Aquí tienes un resumen de tu actividad" />
+
+      {user?.role === 'manager' && team?.orgCode && (
+        <div className="mb-6 p-4 rounded-xl bg-gradient-to-r from-primary-50 to-blue-50 border border-primary-100 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-surface-700">Código de organización</p>
+            <p className="text-xs text-surface-500">Comparte este código para que tu equipo se una</p>
+          </div>
+          <button onClick={handleCopyOrgCode} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-primary-200 hover:bg-primary-50 transition-colors">
+            <span className="font-mono text-lg font-bold text-primary-700 tracking-wider">{team.orgCode}</span>
+            {copied ? <Check size={16} className="text-emerald-600" /> : <Copy size={16} className="text-surface-400" />}
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {stats.map((stat) => (
           <div key={stat.label} className="card p-5">
             <div className="flex items-center justify-between mb-3">
-              <div className={`w-10 h-10 rounded-lg ${stat.color} flex items-center justify-center`}>
-                {stat.icon}
-              </div>
+              <div className={`w-10 h-10 rounded-lg ${stat.color} flex items-center justify-center`}>{stat.icon}</div>
               <ArrowUpRight size={16} className="text-surface-400" />
             </div>
             <p className="text-2xl font-bold text-surface-900">{stat.value}</p>
@@ -50,82 +93,73 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {hasModule('crm') && (
+        {hasModule('crm') && conversations.length > 0 && (
           <div className="card p-5">
             <h3 className="text-sm font-semibold text-surface-800 mb-4 flex items-center gap-2">
-              <MessageSquare size={16} className="text-primary-500" />
-              Conversaciones recientes
+              <MessageSquare size={16} className="text-primary-500" /> Conversaciones recientes
             </h3>
             <div className="space-y-3">
-              {demoConversations.slice(0, 4).map((conv) => (
+              {conversations.slice(0, 4).map((conv) => (
                 <div key={conv.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-surface-50 transition-colors">
                   <div className="w-9 h-9 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-xs font-semibold flex-shrink-0">
-                    {conv.contact?.name.charAt(0)}
+                    {(conv.contact?.name || '?').charAt(0)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-surface-800 truncate">{conv.contact?.name}</p>
-                    <p className="text-xs text-surface-400 truncate">{conv.lastMessage?.content}</p>
+                    <p className="text-sm font-medium text-surface-800 truncate">{conv.contact?.name || 'Contacto'}</p>
+                    <p className="text-xs text-surface-400 truncate">{conv.lastMessage?.content || 'Sin mensajes'}</p>
                   </div>
-                  {conv.unreadCount > 0 && (
-                    <span className="w-5 h-5 rounded-full bg-primary-500 text-white text-xs flex items-center justify-center flex-shrink-0">
-                      {conv.unreadCount}
-                    </span>
-                  )}
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        <div className="card p-5">
-          <h3 className="text-sm font-semibold text-surface-800 mb-4 flex items-center gap-2">
-            <Package size={16} className="text-amber-500" />
-            Pedidos recientes
-          </h3>
-          <div className="space-y-3">
-            {demoOrders.slice(0, 4).map((order) => (
-              <div key={order.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-surface-50 transition-colors">
-                <div className="w-9 h-9 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center text-xs font-semibold flex-shrink-0">
-                  <ShoppingCart size={16} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-surface-800">{order.orderNumber}</p>
-                  <p className="text-xs text-surface-400">{order.contact?.name} - {formatCurrency(order.total)}</p>
-                </div>
-                <span className={`text-xs font-medium capitalize ${
-                  order.status === 'delivered' ? 'text-emerald-600' :
-                  order.status === 'shipped' ? 'text-blue-600' :
-                  'text-amber-600'
-                }`}>
-                  {order.status}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {hasModule('crm') && (
+        {orders.length > 0 && (
           <div className="card p-5">
             <h3 className="text-sm font-semibold text-surface-800 mb-4 flex items-center gap-2">
-              <Bot size={16} className="text-violet-500" />
-              Agentes de IA
+              <Package size={16} className="text-amber-500" /> Pedidos recientes
             </h3>
             <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 rounded-lg bg-surface-50">
-                <div>
-                  <p className="text-sm font-medium text-surface-800">Asistente de Ventas</p>
-                  <p className="text-xs text-surface-400">OpenAI - Todas las conversaciones</p>
+              {orders.slice(0, 4).map((order) => (
+                <div key={order.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-surface-50 transition-colors">
+                  <div className="w-9 h-9 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center flex-shrink-0">
+                    <ShoppingCart size={16} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-surface-800">{order.orderNumber}</p>
+                    <p className="text-xs text-surface-400">{formatCurrency(order.total)}</p>
+                  </div>
+                  <span className="text-xs font-medium text-surface-500">{getOrderStatusLabel(order.status)}</span>
                 </div>
-                <span className="badge-success">Activo</span>
-              </div>
-              <div className="flex items-center justify-between p-3 rounded-lg bg-surface-50">
-                <div>
-                  <p className="text-sm font-medium text-surface-800">Soporte Post-venta</p>
-                  <p className="text-xs text-surface-400">Anthropic - Seleccionadas</p>
-                </div>
-                <span className="badge-neutral">Inactivo</span>
-              </div>
+              ))}
             </div>
+          </div>
+        )}
+
+        {hasModule('crm') && agents.length > 0 && (
+          <div className="card p-5">
+            <h3 className="text-sm font-semibold text-surface-800 mb-4 flex items-center gap-2">
+              <Bot size={16} className="text-violet-500" /> Agentes de IA
+            </h3>
+            <div className="space-y-3">
+              {agents.map(agent => (
+                <div key={agent.id} className="flex items-center justify-between p-3 rounded-lg bg-surface-50">
+                  <div>
+                    <p className="text-sm font-medium text-surface-800">{agent.name}</p>
+                    <p className="text-xs text-surface-400">{agent.providerId}</p>
+                  </div>
+                  <span className={agent.isActive ? 'badge-success' : 'badge-neutral'}>{agent.isActive ? 'Activo' : 'Inactivo'}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {conversations.length === 0 && orders.length === 0 && (
+          <div className="card p-8 text-center col-span-2">
+            <MessageSquare size={40} className="mx-auto mb-3 text-surface-300" />
+            <h3 className="text-sm font-semibold text-surface-700 mb-1">Sin datos aún</h3>
+            <p className="text-xs text-surface-400">Conecta tus canales de Meta en Configuración para empezar a recibir mensajes.</p>
           </div>
         )}
       </div>
