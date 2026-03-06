@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MessageSquare, Users, ShoppingCart, Package, ArrowLeft, Check, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { classNames } from '@/utils/helpers';
 import type { UserRole } from '@/types';
 
-type Step = 'welcome' | 'role' | 'form' | 'success';
+type Step = 'welcome' | 'role' | 'form' | 'google-role' | 'google-form' | 'success';
 
 const roleOptions: { value: UserRole; label: string; desc: string; icon: React.ReactNode; color: string }[] = [
   { value: 'manager', label: 'Gerente', desc: 'Crea y administra tu equipo', icon: <Users size={24} />, color: 'bg-blue-50 text-blue-600 border-blue-200' },
@@ -22,8 +22,25 @@ export default function LoginPage() {
   const [orgCode, setOrgCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn, signInWithGoogle, signUp } = useAuth();
+  const { user, pendingGoogleUser, signIn, signInWithGoogle, signUp, completeGoogleSignUp } = useAuth();
   const navigate = useNavigate();
+
+  // Redirect to dashboard when user is authenticated
+  useEffect(() => {
+    if (user) {
+      setStep('success');
+      const timer = setTimeout(() => navigate('/dashboard', { replace: true }), 800);
+      return () => clearTimeout(timer);
+    }
+  }, [user, navigate]);
+
+  // Show role selection when Google user needs setup
+  useEffect(() => {
+    if (pendingGoogleUser && step !== 'google-role' && step !== 'google-form' && step !== 'success') {
+      setStep('google-role');
+      setLoading(false);
+    }
+  }, [pendingGoogleUser, step]);
 
   const handleGoogleSignIn = async () => {
     setError('');
@@ -42,8 +59,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await signIn(email, password);
-      setStep('success');
-      setTimeout(() => navigate('/dashboard'), 800);
+      // useEffect on `user` will handle redirect
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Credenciales incorrectas');
       setLoading(false);
@@ -56,10 +72,22 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await signUp(email, password, name, selectedRole, selectedRole !== 'manager' ? orgCode : undefined);
-      setStep('success');
-      setTimeout(() => navigate('/dashboard'), 800);
+      // useEffect on `user` will handle redirect
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error al crear cuenta');
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleComplete = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      await completeGoogleSignUp(selectedRole, selectedRole !== 'manager' ? orgCode : undefined);
+      // useEffect on `user` will handle redirect
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Error al completar registro');
       setLoading(false);
     }
   };
@@ -94,7 +122,7 @@ export default function LoginPage() {
 
         {/* Success */}
         {step === 'success' && (
-          <div className="card p-8 text-center">
+          <div className="card p-8 text-center animate-in fade-in duration-300">
             <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4">
               <Check size={32} className="text-emerald-600" />
             </div>
@@ -153,7 +181,114 @@ export default function LoginPage() {
           </div>
         )}
 
-        {/* Role Selection */}
+        {/* Google Role Selection — shown when Google user has no Firestore account */}
+        {step === 'google-role' && pendingGoogleUser && (
+          <div className="card p-8">
+            <div className="flex items-center gap-3 mb-6 p-3 rounded-lg bg-surface-50">
+              <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-bold text-sm">
+                {pendingGoogleUser.displayName?.charAt(0)?.toUpperCase() || 'G'}
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-surface-800">{pendingGoogleUser.displayName}</p>
+                <p className="text-xs text-surface-500">{pendingGoogleUser.email}</p>
+              </div>
+            </div>
+
+            <h2 className="text-lg font-semibold text-surface-800 mb-2">¡Bienvenido!</h2>
+            <p className="text-sm text-surface-500 mb-6">Es tu primera vez. Selecciona tu rol para continuar:</p>
+
+            {error && (
+              <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-100 text-red-700 text-sm">{error}</div>
+            )}
+
+            <div className="space-y-3">
+              {roleOptions.map((r) => (
+                <button
+                  key={r.value}
+                  onClick={() => {
+                    setSelectedRole(r.value);
+                    if (r.value === 'manager') {
+                      // Manager doesn't need org code, complete immediately
+                      setLoading(true);
+                      setError('');
+                      completeGoogleSignUp('manager').catch((err) => {
+                        setError(err instanceof Error ? err.message : 'Error al completar registro');
+                        setLoading(false);
+                      });
+                    } else {
+                      setStep('google-form');
+                    }
+                  }}
+                  disabled={loading}
+                  className={classNames(
+                    'w-full flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-all duration-200 hover:shadow-md disabled:opacity-50',
+                    r.color
+                  )}
+                >
+                  <div className="flex-shrink-0">{r.icon}</div>
+                  <div>
+                    <p className="font-semibold text-sm">{r.label}</p>
+                    <p className="text-xs opacity-80">{r.desc}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {loading && (
+              <div className="mt-4 flex items-center justify-center gap-2 text-sm text-surface-500">
+                <Loader2 size={16} className="animate-spin" /> Creando tu cuenta...
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Google Org Code Form — for employees signing up with Google */}
+        {step === 'google-form' && pendingGoogleUser && (
+          <div className="card p-8">
+            <button onClick={() => { setStep('google-role'); setError(''); }} className="flex items-center gap-1 text-sm text-surface-500 hover:text-surface-700 mb-4 transition-colors">
+              <ArrowLeft size={16} /> Cambiar rol
+            </button>
+
+            <div className="flex items-center gap-3 mb-6 p-3 rounded-lg bg-surface-50">
+              <div className={classNames('w-10 h-10 rounded-lg flex items-center justify-center', roleOptions.find(r => r.value === selectedRole)?.color || '')}>
+                {roleOptions.find(r => r.value === selectedRole)?.icon}
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-surface-800">
+                  {pendingGoogleUser.displayName} — {roleOptions.find(r => r.value === selectedRole)?.label}
+                </p>
+                <p className="text-xs text-surface-500">{pendingGoogleUser.email}</p>
+              </div>
+            </div>
+
+            {error && (
+              <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-100 text-red-700 text-sm">{error}</div>
+            )}
+
+            <form onSubmit={handleGoogleComplete} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-surface-700 mb-1">Código de organización</label>
+                <input
+                  type="text"
+                  className="input-field uppercase tracking-wider text-center font-mono text-lg"
+                  placeholder="ABC123"
+                  value={orgCode}
+                  onChange={(e) => setOrgCode(e.target.value.toUpperCase())}
+                  required
+                  maxLength={6}
+                />
+                <p className="text-xs text-surface-400 mt-1">Pide el código a tu gerente para unirte a su equipo</p>
+              </div>
+
+              <button type="submit" disabled={loading} className="btn-primary w-full py-2.5 flex items-center justify-center gap-2">
+                {loading && <Loader2 size={16} className="animate-spin" />}
+                {loading ? 'Uniéndote al equipo...' : 'Unirme al equipo'}
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* Email/Password Role Selection */}
         {step === 'role' && (
           <div className="card p-8">
             <button onClick={goToLogin} className="flex items-center gap-1 text-sm text-surface-500 hover:text-surface-700 mb-4 transition-colors">
@@ -183,7 +318,7 @@ export default function LoginPage() {
           </div>
         )}
 
-        {/* Registration Form */}
+        {/* Email/Password Registration Form */}
         {step === 'form' && (
           <div className="card p-8">
             <button onClick={() => setStep('role')} className="flex items-center gap-1 text-sm text-surface-500 hover:text-surface-700 mb-4 transition-colors">
