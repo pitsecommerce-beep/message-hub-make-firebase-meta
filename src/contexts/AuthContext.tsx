@@ -50,10 +50,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (userDoc.exists()) {
             const data = userDoc.data();
             setUser({
-              uid: fbUser.uid,
-              modules: [],
-              role: 'admin',
               ...data,
+              uid: fbUser.uid,
+              modules: data.modules || [],
+              role: data.role || 'admin',
             } as AppUser);
           }
         } else {
