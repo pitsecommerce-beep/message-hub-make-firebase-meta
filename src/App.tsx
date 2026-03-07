@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { ThemeProvider } from '@/contexts/ThemeContext';
 import AppLayout from '@/components/layout/AppLayout';
 import LoginPage from '@/pages/auth/LoginPage';
 import DashboardPage from '@/pages/DashboardPage';
@@ -11,6 +12,7 @@ import WarehousePage from '@/pages/wms/WarehousePage';
 import AdminPage from '@/pages/admin/AdminPage';
 import SettingsPage from '@/pages/admin/SettingsPage';
 import ConnectionsPage from '@/pages/crm/ConnectionsPage';
+import DatabasesPage from '@/pages/crm/DatabasesPage';
 import type { ReactNode } from 'react';
 import type { ModuleAccess, UserRole } from '@/types';
 
@@ -18,7 +20,7 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-surface-50">
+      <div className="min-h-screen flex items-center justify-center bg-surface-50 dark:bg-surface-900">
         <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
@@ -56,6 +58,7 @@ function AppRoutes() {
         <Route path="/orders" element={<ModuleRoute module="crm"><OrdersPage /></ModuleRoute>} />
         <Route path="/ai-agents" element={<ModuleRoute module="crm"><AIAgentsPage /></ModuleRoute>} />
         <Route path="/connections" element={<ModuleRoute module="crm"><ConnectionsPage /></ModuleRoute>} />
+        <Route path="/databases" element={<ModuleRoute module="crm"><DatabasesPage /></ModuleRoute>} />
         <Route path="/warehouse" element={<ModuleRoute module="wms"><WarehousePage /></ModuleRoute>} />
         <Route path="/team" element={<RoleRoute roles={['manager']}><AdminPage /></RoleRoute>} />
         <Route path="/settings" element={<RoleRoute roles={['manager']}><SettingsPage /></RoleRoute>} />
@@ -68,10 +71,12 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter basename="/message-hub-make-firebase-meta">
-        <AppRoutes />
-      </BrowserRouter>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <BrowserRouter basename="/message-hub-make-firebase-meta">
+          <AppRoutes />
+        </BrowserRouter>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

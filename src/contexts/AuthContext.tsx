@@ -46,16 +46,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     async function initFirebase() {
       const { auth } = await import('@/services/firebase');
-      const { onAuthStateChanged, getRedirectResult } = await import('firebase/auth');
+      const { onAuthStateChanged } = await import('firebase/auth');
       const { doc, getDoc } = await import('firebase/firestore');
       const { db } = await import('@/services/firebase');
-
-      // Process redirect result first (important for Google sign-in)
-      try {
-        await getRedirectResult(auth);
-      } catch {
-        // Redirect errors are handled by onAuthStateChanged
-      }
 
       onAuthStateChanged(auth, async (fbUser) => {
         if (cancelled) return;
@@ -182,9 +175,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithGoogle = async () => {
     const { auth } = await import('@/services/firebase');
-    const { GoogleAuthProvider, signInWithRedirect } = await import('firebase/auth');
+    const { GoogleAuthProvider, signInWithPopup } = await import('firebase/auth');
     const provider = new GoogleAuthProvider();
-    await signInWithRedirect(auth, provider);
+    provider.setCustomParameters({ prompt: 'select_account' });
+    const result = await signInWithPopup(auth, provider);
+    // onAuthStateChanged will handle the rest
+    if (result.user) {
+      const { doc, getDoc } = await import('firebase/firestore');
+      const { db } = await import('@/services/firebase');
+      const userRef = doc(db, 'users', result.user.uid);
+      const userDoc = await getDoc(userRef);
+      if (!userDoc.exists()) {
+        if (result.user.email === ADMIN_EMAIL) {
+          await createUserAndTeam(result.user.uid, result.user.email || '', result.user.displayName || 'Admin', 'manager');
+        } else {
+          setPendingGoogleUser({
+            uid: result.user.uid,
+            email: result.user.email || '',
+            displayName: result.user.displayName || result.user.email || '',
+          });
+        }
+      }
+    }
   };
 
   const signUp = async (email: string, password: string, name: string, role: UserRole, orgCode?: string) => {
