@@ -49,31 +49,46 @@
 
 ### Reglas de Firestore
 
+Las reglas están en el archivo `firestore.rules` en la raíz del proyecto. Puedes desplegarlas con:
+
+```bash
+firebase deploy --only firestore:rules
+```
+
 ```javascript
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users
+
+    // Helper: get current user data
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // Users — any authenticated user can read; users can only write their own doc
     match /users/{userId} {
       allow read: if request.auth != null;
-      allow write: if request.auth.uid == userId ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      allow write: if request.auth != null && request.auth.uid == userId;
     }
 
     // Teams
     match /teams/{teamId} {
-      allow read: if request.auth != null &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teamId == teamId;
-      allow write: if request.auth != null && (
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'manager']
-      );
+      // Any authenticated user can read teams (needed for orgCode lookup during registration)
+      allow read: if request.auth != null;
 
-      // Subcollections
+      // A user can create a team if they are the owner (manager registration flow)
+      allow create: if request.auth != null &&
+        request.resource.data.ownerId == request.auth.uid;
+
+      // Only managers belonging to this team can update/delete it
+      allow update, delete: if request.auth != null &&
+        getUserData().teamId == teamId &&
+        getUserData().role == 'manager';
+
+      // Subcollections: contacts, orders, conversations, messages, aiAgents, products
       match /{subcollection}/{docId} {
-        allow read: if request.auth != null &&
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teamId == teamId;
-        allow write: if request.auth != null &&
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teamId == teamId;
+        allow read, write: if request.auth != null &&
+          getUserData().teamId == teamId;
       }
     }
 
@@ -81,7 +96,7 @@ service cloud.firestore {
     match /invites/{inviteId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'manager'];
+        getUserData().role == 'manager';
     }
   }
 }
