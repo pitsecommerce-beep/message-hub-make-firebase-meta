@@ -74,6 +74,9 @@ export interface Contact {
   name: string;
   phone?: string;
   email?: string;
+  company?: string;
+  rfc?: string;
+  address?: string;
   platform: MessagePlatform;
   platformId: string;
   avatarUrl?: string;
@@ -82,6 +85,19 @@ export interface Contact {
   createdAt: string;
   updatedAt: string;
   lastMessageAt: string;
+}
+
+export interface Product {
+  id: string;
+  teamId: string;
+  sku: string;
+  name: string;
+  description?: string;
+  unitPrice: number;
+  category?: string;
+  stock?: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Conversation {

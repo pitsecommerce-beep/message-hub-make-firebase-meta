@@ -10,6 +10,7 @@ import {
   where,
   orderBy,
   onSnapshot,
+  writeBatch,
   type QueryConstraint,
   type Unsubscribe,
 } from 'firebase/firestore';
@@ -23,6 +24,7 @@ import type {
   AppUser,
   Team,
   TeamInvite,
+  Product,
 } from '@/types';
 
 function teamCollection(teamId: string, col: string) {
@@ -43,6 +45,10 @@ export async function createContact(teamId: string, data: Omit<Contact, 'id'>): 
 
 export async function updateContact(teamId: string, id: string, data: Partial<Contact>) {
   await updateDoc(doc(db, 'teams', teamId, 'contacts', id), data);
+}
+
+export async function deleteContact(teamId: string, id: string) {
+  await deleteDoc(doc(db, 'teams', teamId, 'contacts', id));
 }
 
 // Conversations
@@ -123,6 +129,75 @@ export async function updateAIAgent(teamId: string, id: string, data: Partial<AI
 
 export async function deleteAIAgent(teamId: string, id: string) {
   await deleteDoc(doc(db, 'teams', teamId, 'aiAgents', id));
+}
+
+// Products
+export async function getProducts(teamId: string): Promise<Product[]> {
+  const q = query(teamCollection(teamId, 'products'), orderBy('name', 'asc'));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }) as Product);
+}
+
+export async function createProduct(teamId: string, data: Omit<Product, 'id'>): Promise<string> {
+  const ref = await addDoc(teamCollection(teamId, 'products'), data);
+  return ref.id;
+}
+
+export async function updateProduct(teamId: string, id: string, data: Partial<Product>) {
+  await updateDoc(doc(db, 'teams', teamId, 'products', id), data);
+}
+
+export async function deleteProduct(teamId: string, id: string) {
+  await deleteDoc(doc(db, 'teams', teamId, 'products', id));
+}
+
+export async function bulkImportProducts(teamId: string, products: Omit<Product, 'id'>[]): Promise<number> {
+  const batchSize = 400;
+  let imported = 0;
+  for (let i = 0; i < products.length; i += batchSize) {
+    const batch = writeBatch(db);
+    const chunk = products.slice(i, i + batchSize);
+    chunk.forEach(product => {
+      const ref = doc(teamCollection(teamId, 'products'));
+      batch.set(ref, product);
+    });
+    await batch.commit();
+    imported += chunk.length;
+  }
+  return imported;
+}
+
+export async function bulkImportContacts(teamId: string, contacts: Omit<Contact, 'id'>[]): Promise<number> {
+  const batchSize = 400;
+  let imported = 0;
+  for (let i = 0; i < contacts.length; i += batchSize) {
+    const batch = writeBatch(db);
+    const chunk = contacts.slice(i, i + batchSize);
+    chunk.forEach(contact => {
+      const ref = doc(teamCollection(teamId, 'contacts'));
+      batch.set(ref, contact);
+    });
+    await batch.commit();
+    imported += chunk.length;
+  }
+  return imported;
+}
+
+// Generic bulk import for custom data
+export async function bulkImportData(teamId: string, collectionName: string, data: Record<string, unknown>[]): Promise<number> {
+  const batchSize = 400;
+  let imported = 0;
+  for (let i = 0; i < data.length; i += batchSize) {
+    const batch = writeBatch(db);
+    const chunk = data.slice(i, i + batchSize);
+    chunk.forEach(item => {
+      const ref = doc(teamCollection(teamId, collectionName));
+      batch.set(ref, item);
+    });
+    await batch.commit();
+    imported += chunk.length;
+  }
+  return imported;
 }
 
 // Team

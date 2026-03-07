@@ -1,313 +1,385 @@
 {
-  "name": "MessageHub - Meta ↔ Firebase via yCloud",
-  "flow": [
-    {
-      "id": 1,
-      "module": "gateway:CustomWebHook",
-      "version": 1,
-      "parameters": {
-        "hook": "__WEBHOOK_ID__",
-        "maxResults": 1
-      },
-      "mapper": {},
-      "metadata": {
-        "designer": { "x": 0, "y": 0 },
-        "restore": {},
-        "expect": [
-          { "name": "event", "type": "text" },
-          { "name": "whatsappInboundMessage", "type": "collection",
-            "spec": [
-              { "name": "id", "type": "text" },
-              { "name": "from", "type": "text" },
-              { "name": "type", "type": "text" },
-              { "name": "text", "type": "collection", "spec": [
-                { "name": "body", "type": "text" }
-              ]},
-              { "name": "timestamp", "type": "text" }
-            ]
-          },
-          { "name": "contact", "type": "collection",
-            "spec": [
-              { "name": "profile", "type": "collection", "spec": [
-                { "name": "name", "type": "text" }
-              ]},
-              { "name": "wa_id", "type": "text" }
-            ]
-          }
-        ]
-      },
-      "notes": "PASO 1: Webhook que recibe mensajes de yCloud. Configura este URL en yCloud > Webhooks > Message Received."
-    },
-    {
-      "id": 2,
-      "module": "firebase:firestore:searchDocuments",
-      "version": 3,
-      "parameters": {
-        "connection": "__FIREBASE_CONNECTION__"
-      },
-      "mapper": {
-        "collectionPath": "teams/__TEAM_ID__/contacts",
-        "filter": [
-          {
-            "fieldPath": "platformId",
-            "op": "==",
-            "value": "{{1.contact.wa_id}}"
-          }
-        ],
-        "limit": 1
-      },
-      "metadata": {
-        "designer": { "x": 300, "y": 0 }
-      },
-      "notes": "PASO 2: Busca si el contacto ya existe en Firebase."
-    },
-    {
-      "id": 3,
-      "module": "builtin:BasicRouter",
-      "version": 1,
-      "parameters": {},
-      "mapper": {},
-      "metadata": {
-        "designer": { "x": 600, "y": 0 }
-      },
-      "notes": "PASO 3: Router - Si el contacto existe va por un camino, si no existe lo crea."
-    },
-    {
-      "id": 4,
-      "module": "firebase:firestore:addDocument",
-      "version": 3,
-      "parameters": {
-        "connection": "__FIREBASE_CONNECTION__"
-      },
-      "mapper": {
-        "collectionPath": "teams/__TEAM_ID__/contacts",
-        "data": {
-          "name": "{{1.contact.profile.name}}",
-          "phone": "{{1.contact.wa_id}}",
-          "platform": "whatsapp",
-          "platformId": "{{1.contact.wa_id}}",
-          "tags": [],
-          "notes": "",
-          "teamId": "__TEAM_ID__",
-          "createdAt": "{{now}}",
-          "updatedAt": "{{now}}",
-          "lastMessageAt": "{{now}}"
-        }
-      },
-      "metadata": {
-        "designer": { "x": 900, "y": 150 }
-      },
-      "filter": {
-        "name": "Contact NOT found",
-        "conditions": [
-          [ { "a": "{{length(2)}}", "b": "0", "o": "number:equal" } ]
-        ]
-      },
-      "notes": "PASO 4a: Si el contacto NO existe, lo crea en Firebase."
-    },
-    {
-      "id": 5,
-      "module": "firebase:firestore:addDocument",
-      "version": 3,
-      "parameters": {
-        "connection": "__FIREBASE_CONNECTION__"
-      },
-      "mapper": {
-        "collectionPath": "teams/__TEAM_ID__/conversations",
-        "data": {
-          "contactId": "{{ifempty(2[1].__name__; 4.__name__)}}",
-          "teamId": "__TEAM_ID__",
-          "platform": "whatsapp",
-          "status": "open",
-          "aiEnabled": false,
-          "unreadCount": 1,
-          "createdAt": "{{now}}",
-          "updatedAt": "{{now}}"
-        }
-      },
-      "metadata": {
-        "designer": { "x": 1200, "y": 0 }
-      },
-      "notes": "PASO 5: Crea o actualiza la conversación."
-    },
-    {
-      "id": 6,
-      "module": "firebase:firestore:addDocument",
-      "version": 3,
-      "parameters": {
-        "connection": "__FIREBASE_CONNECTION__"
-      },
-      "mapper": {
-        "collectionPath": "teams/__TEAM_ID__/messages",
-        "data": {
-          "conversationId": "{{5.__name__}}",
-          "contactId": "{{ifempty(2[1].__name__; 4.__name__)}}",
-          "teamId": "__TEAM_ID__",
-          "direction": "inbound",
-          "platform": "whatsapp",
-          "content": "{{1.whatsappInboundMessage.text.body}}",
-          "messageType": "text",
-          "status": "delivered",
-          "isAiGenerated": false,
-          "createdAt": "{{now}}"
-        }
-      },
-      "metadata": {
-        "designer": { "x": 1500, "y": 0 }
-      },
-      "notes": "PASO 6: Guarda el mensaje entrante en Firebase."
-    },
-    {
-      "id": 7,
-      "module": "firebase:firestore:searchDocuments",
-      "version": 3,
-      "parameters": {
-        "connection": "__FIREBASE_CONNECTION__"
-      },
-      "mapper": {
-        "collectionPath": "teams/__TEAM_ID__/aiAgents",
-        "filter": [
-          { "fieldPath": "isActive", "op": "==", "value": true }
-        ],
-        "limit": 1
-      },
-      "metadata": {
-        "designer": { "x": 1800, "y": 0 }
-      },
-      "notes": "PASO 7: Busca si hay un agente de IA activo."
-    },
-    {
-      "id": 8,
-      "module": "builtin:BasicRouter",
-      "version": 1,
-      "parameters": {},
-      "mapper": {},
-      "metadata": {
-        "designer": { "x": 2100, "y": 0 }
-      },
-      "notes": "PASO 8: Router - Si hay agente IA activo, genera respuesta automática."
-    },
-    {
-      "id": 9,
-      "module": "openai:CreateChatCompletion",
-      "version": 1,
-      "parameters": {
-        "connection": "__OPENAI_CONNECTION__"
-      },
-      "mapper": {
-        "model": "{{7[1].model}}",
-        "messages": [
-          { "role": "system", "content": "{{7[1].systemPrompt}}" },
-          { "role": "user", "content": "{{1.whatsappInboundMessage.text.body}}" }
-        ],
-        "max_tokens": "{{7[1].maxTokens}}",
-        "temperature": "{{7[1].temperature}}"
-      },
-      "metadata": {
-        "designer": { "x": 2400, "y": -150 }
-      },
-      "filter": {
-        "name": "AI Agent Active",
-        "conditions": [
-          [ { "a": "{{length(7)}}", "b": "0", "o": "number:notEqual" } ]
-        ]
-      },
-      "notes": "PASO 9: Genera respuesta con IA (OpenAI/compatible)."
-    },
-    {
-      "id": 10,
-      "module": "http:ActionSendData",
-      "version": 3,
-      "parameters": {},
-      "mapper": {
-        "url": "https://api.ycloud.com/v2/whatsapp/messages",
-        "method": "POST",
-        "headers": [
-          { "name": "X-API-Key", "value": "__YCLOUD_API_KEY__" },
-          { "name": "Content-Type", "value": "application/json" }
-        ],
-        "body": "{\"from\":\"__PHONE_NUMBER__\",\"to\":\"{{1.contact.wa_id}}\",\"type\":\"text\",\"text\":{\"body\":\"{{9.choices[1].message.content}}\"}}"
-      },
-      "metadata": {
-        "designer": { "x": 2700, "y": -150 }
-      },
-      "notes": "PASO 10: Envía la respuesta de IA al contacto vía yCloud."
-    },
-    {
-      "id": 11,
-      "module": "firebase:firestore:addDocument",
-      "version": 3,
-      "parameters": {
-        "connection": "__FIREBASE_CONNECTION__"
-      },
-      "mapper": {
-        "collectionPath": "teams/__TEAM_ID__/messages",
-        "data": {
-          "conversationId": "{{5.__name__}}",
-          "contactId": "{{ifempty(2[1].__name__; 4.__name__)}}",
-          "teamId": "__TEAM_ID__",
-          "direction": "outbound",
-          "platform": "whatsapp",
-          "content": "{{9.choices[1].message.content}}",
-          "messageType": "text",
-          "status": "sent",
-          "isAiGenerated": true,
-          "createdAt": "{{now}}"
-        }
-      },
-      "metadata": {
-        "designer": { "x": 3000, "y": -150 }
-      },
-      "notes": "PASO 11: Guarda la respuesta del agente IA en Firebase."
-    },
-    {
-      "id": 12,
-      "module": "gateway:CustomWebHook",
-      "version": 1,
-      "parameters": {
-        "hook": "__OUTBOUND_WEBHOOK_ID__",
-        "maxResults": 1
-      },
-      "mapper": {},
-      "metadata": {
-        "designer": { "x": 0, "y": 400 },
-        "expect": [
-          { "name": "to", "type": "text" },
-          { "name": "message", "type": "text" },
-          { "name": "conversationId", "type": "text" },
-          { "name": "contactId", "type": "text" },
-          { "name": "teamId", "type": "text" }
-        ]
-      },
-      "notes": "ESCENARIO 2 - PASO 1: Webhook para enviar mensajes desde el CRM. El frontend hace POST a este webhook cuando un agente envía un mensaje."
-    },
-    {
-      "id": 13,
-      "module": "http:ActionSendData",
-      "version": 3,
-      "parameters": {},
-      "mapper": {
-        "url": "https://api.ycloud.com/v2/whatsapp/messages",
-        "method": "POST",
-        "headers": [
-          { "name": "X-API-Key", "value": "__YCLOUD_API_KEY__" },
-          { "name": "Content-Type", "value": "application/json" }
-        ],
-        "body": "{\"from\":\"__PHONE_NUMBER__\",\"to\":\"{{12.to}}\",\"type\":\"text\",\"text\":{\"body\":\"{{12.message}}\"}}"
-      },
-      "metadata": {
-        "designer": { "x": 300, "y": 400 }
-      },
-      "notes": "ESCENARIO 2 - PASO 2: Envía el mensaje al contacto vía yCloud WhatsApp API."
-    }
-  ],
-  "metadata": {
+  "name": "MessageHub - yCloud WhatsApp to Firebase",
+  "blueprint": {
     "version": 1,
-    "scenario": {
-      "roundtrips": 1,
-      "maxErrors": 3,
-      "autoCommit": true,
-      "sequential": false
-    }
-  }
+    "scheduling": {
+      "type": "indefinitely"
+    },
+    "modules": [
+      {
+        "id": 1,
+        "module": "gateway:CustomWebHook",
+        "version": 1,
+        "parameters": {
+          "hook": {
+            "label": "yCloud Inbound Webhook",
+            "type": "hook"
+          },
+          "maxResults": 1
+        },
+        "mapper": {},
+        "metadata": {
+          "designer": { "x": 0, "y": 0 },
+          "restore": {},
+          "parameters": [
+            {
+              "name": "hook",
+              "type": "hook:gateway-webhook",
+              "label": "Webhook",
+              "required": true
+            }
+          ],
+          "expect": [
+            { "name": "event", "type": "text", "label": "Event Type" },
+            {
+              "name": "whatsappInboundMessage",
+              "type": "collection",
+              "label": "Inbound Message",
+              "spec": [
+                { "name": "id", "type": "text", "label": "Message ID" },
+                { "name": "from", "type": "text", "label": "From Phone" },
+                { "name": "type", "type": "text", "label": "Message Type" },
+                {
+                  "name": "text",
+                  "type": "collection",
+                  "label": "Text Content",
+                  "spec": [
+                    { "name": "body", "type": "text", "label": "Body" }
+                  ]
+                },
+                { "name": "timestamp", "type": "text", "label": "Timestamp" }
+              ]
+            },
+            {
+              "name": "contact",
+              "type": "collection",
+              "label": "Contact Info",
+              "spec": [
+                {
+                  "name": "profile",
+                  "type": "collection",
+                  "label": "Profile",
+                  "spec": [
+                    { "name": "name", "type": "text", "label": "Name" }
+                  ]
+                },
+                { "name": "wa_id", "type": "text", "label": "WhatsApp ID" }
+              ]
+            }
+          ]
+        },
+        "routes": [
+          {
+            "flow": [
+              {
+                "id": 2,
+                "module": "google-firebase-firestore:searchDocuments",
+                "version": 3,
+                "parameters": {},
+                "mapper": {
+                  "select": "list",
+                  "collectionId": "teams/__TEAM_ID__/contacts",
+                  "conditions": [
+                    [
+                      {
+                        "fieldPath": "platformId",
+                        "op": "EQUAL",
+                        "value": "{{1.contact.wa_id}}"
+                      }
+                    ]
+                  ],
+                  "limit": "1"
+                },
+                "metadata": {
+                  "designer": { "x": 300, "y": 0 },
+                  "parameters": [
+                    {
+                      "name": "connection",
+                      "type": "account:google-firebase",
+                      "label": "Firebase Connection",
+                      "required": true
+                    }
+                  ]
+                }
+              },
+              {
+                "id": 3,
+                "module": "builtin:BasicRouter",
+                "version": 1,
+                "mapper": {},
+                "metadata": {
+                  "designer": { "x": 600, "y": 0 }
+                },
+                "routes": [
+                  {
+                    "label": "New Contact",
+                    "filter": {
+                      "name": "Contact NOT found",
+                      "conditions": [
+                        [
+                          {
+                            "a": "{{length(2)}}",
+                            "b": "0",
+                            "o": "number:equal"
+                          }
+                        ]
+                      ]
+                    },
+                    "flow": [
+                      {
+                        "id": 4,
+                        "module": "google-firebase-firestore:addDocument",
+                        "version": 3,
+                        "parameters": {},
+                        "mapper": {
+                          "collectionId": "teams/__TEAM_ID__/contacts",
+                          "data": "{\"name\":\"{{1.contact.profile.name}}\",\"phone\":\"{{1.contact.wa_id}}\",\"platform\":\"whatsapp\",\"platformId\":\"{{1.contact.wa_id}}\",\"tags\":[],\"notes\":\"\",\"teamId\":\"__TEAM_ID__\",\"createdAt\":\"{{now}}\",\"updatedAt\":\"{{now}}\",\"lastMessageAt\":\"{{now}}\"}"
+                        },
+                        "metadata": {
+                          "designer": { "x": 900, "y": 150 }
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "label": "Existing Contact",
+                    "filter": {
+                      "name": "Contact found",
+                      "conditions": [
+                        [
+                          {
+                            "a": "{{length(2)}}",
+                            "b": "0",
+                            "o": "number:notEqual"
+                          }
+                        ]
+                      ]
+                    },
+                    "flow": [
+                      {
+                        "id": 14,
+                        "module": "google-firebase-firestore:updateDocument",
+                        "version": 3,
+                        "parameters": {},
+                        "mapper": {
+                          "documentId": "teams/__TEAM_ID__/contacts/{{2.`__name__`}}",
+                          "data": "{\"lastMessageAt\":\"{{now}}\",\"updatedAt\":\"{{now}}\"}"
+                        },
+                        "metadata": {
+                          "designer": { "x": 900, "y": -150 }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": 5,
+                "module": "google-firebase-firestore:addDocument",
+                "version": 3,
+                "parameters": {},
+                "mapper": {
+                  "collectionId": "teams/__TEAM_ID__/conversations",
+                  "data": "{\"contactId\":\"{{ifempty(2.`__name__`; 4.`__name__`)}}\",\"teamId\":\"__TEAM_ID__\",\"platform\":\"whatsapp\",\"status\":\"open\",\"aiEnabled\":false,\"unreadCount\":1,\"createdAt\":\"{{now}}\",\"updatedAt\":\"{{now}}\"}"
+                },
+                "metadata": {
+                  "designer": { "x": 1200, "y": 0 }
+                }
+              },
+              {
+                "id": 6,
+                "module": "google-firebase-firestore:addDocument",
+                "version": 3,
+                "parameters": {},
+                "mapper": {
+                  "collectionId": "teams/__TEAM_ID__/messages",
+                  "data": "{\"conversationId\":\"{{5.`__name__`}}\",\"contactId\":\"{{ifempty(2.`__name__`; 4.`__name__`)}}\",\"teamId\":\"__TEAM_ID__\",\"direction\":\"inbound\",\"platform\":\"whatsapp\",\"content\":\"{{1.whatsappInboundMessage.text.body}}\",\"messageType\":\"text\",\"status\":\"delivered\",\"isAiGenerated\":false,\"createdAt\":\"{{now}}\"}"
+                },
+                "metadata": {
+                  "designer": { "x": 1500, "y": 0 }
+                }
+              },
+              {
+                "id": 7,
+                "module": "google-firebase-firestore:searchDocuments",
+                "version": 3,
+                "parameters": {},
+                "mapper": {
+                  "select": "list",
+                  "collectionId": "teams/__TEAM_ID__/aiAgents",
+                  "conditions": [
+                    [
+                      {
+                        "fieldPath": "isActive",
+                        "op": "EQUAL",
+                        "value": true
+                      }
+                    ]
+                  ],
+                  "limit": "1"
+                },
+                "metadata": {
+                  "designer": { "x": 1800, "y": 0 }
+                }
+              },
+              {
+                "id": 8,
+                "module": "builtin:BasicRouter",
+                "version": 1,
+                "mapper": {},
+                "metadata": {
+                  "designer": { "x": 2100, "y": 0 }
+                },
+                "routes": [
+                  {
+                    "label": "AI Responds",
+                    "filter": {
+                      "name": "AI Agent found",
+                      "conditions": [
+                        [
+                          {
+                            "a": "{{length(7)}}",
+                            "b": "0",
+                            "o": "number:notEqual"
+                          }
+                        ]
+                      ]
+                    },
+                    "flow": [
+                      {
+                        "id": 9,
+                        "module": "openai:CreateChatCompletion",
+                        "version": 1,
+                        "parameters": {},
+                        "mapper": {
+                          "model": "{{7.model}}",
+                          "messages": [
+                            { "role": "system", "content": "{{7.systemPrompt}}" },
+                            { "role": "user", "content": "{{1.whatsappInboundMessage.text.body}}" }
+                          ],
+                          "max_tokens": "{{7.maxTokens}}",
+                          "temperature": "{{7.temperature}}"
+                        },
+                        "metadata": {
+                          "designer": { "x": 2400, "y": -150 },
+                          "parameters": [
+                            {
+                              "name": "connection",
+                              "type": "account:openai",
+                              "label": "OpenAI Connection",
+                              "required": true
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "id": 10,
+                        "module": "http:ActionSendData",
+                        "version": 3,
+                        "parameters": {},
+                        "mapper": {
+                          "url": "https://api.ycloud.com/v2/whatsapp/messages",
+                          "serializeUrl": false,
+                          "method": "POST",
+                          "headers": [
+                            { "name": "X-API-Key", "value": "__YCLOUD_API_KEY__" },
+                            { "name": "Content-Type", "value": "application/json" }
+                          ],
+                          "qs": [],
+                          "bodyType": "raw",
+                          "parseResponse": true,
+                          "contentType": "application/json",
+                          "body": "{\"from\":\"__PHONE_NUMBER__\",\"to\":\"{{1.contact.wa_id}}\",\"type\":\"text\",\"text\":{\"body\":\"{{9.choices[1].message.content}}\"}}"
+                        },
+                        "metadata": {
+                          "designer": { "x": 2700, "y": -150 }
+                        }
+                      },
+                      {
+                        "id": 11,
+                        "module": "google-firebase-firestore:addDocument",
+                        "version": 3,
+                        "parameters": {},
+                        "mapper": {
+                          "collectionId": "teams/__TEAM_ID__/messages",
+                          "data": "{\"conversationId\":\"{{5.`__name__`}}\",\"contactId\":\"{{ifempty(2.`__name__`; 4.`__name__`)}}\",\"teamId\":\"__TEAM_ID__\",\"direction\":\"outbound\",\"platform\":\"whatsapp\",\"content\":\"{{9.choices[1].message.content}}\",\"messageType\":\"text\",\"status\":\"sent\",\"isAiGenerated\":true,\"createdAt\":\"{{now}}\"}"
+                        },
+                        "metadata": {
+                          "designer": { "x": 3000, "y": -150 }
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "label": "No AI Agent"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 12,
+        "module": "gateway:CustomWebHook",
+        "version": 1,
+        "parameters": {
+          "hook": {
+            "label": "CRM Outbound Webhook",
+            "type": "hook"
+          },
+          "maxResults": 1
+        },
+        "mapper": {},
+        "metadata": {
+          "designer": { "x": 0, "y": 500 },
+          "parameters": [
+            {
+              "name": "hook",
+              "type": "hook:gateway-webhook",
+              "label": "Webhook",
+              "required": true
+            }
+          ],
+          "expect": [
+            { "name": "to", "type": "text", "label": "Recipient Phone" },
+            { "name": "message", "type": "text", "label": "Message Text" },
+            { "name": "conversationId", "type": "text", "label": "Conversation ID" },
+            { "name": "contactId", "type": "text", "label": "Contact ID" },
+            { "name": "teamId", "type": "text", "label": "Team ID" }
+          ]
+        },
+        "routes": [
+          {
+            "flow": [
+              {
+                "id": 13,
+                "module": "http:ActionSendData",
+                "version": 3,
+                "parameters": {},
+                "mapper": {
+                  "url": "https://api.ycloud.com/v2/whatsapp/messages",
+                  "serializeUrl": false,
+                  "method": "POST",
+                  "headers": [
+                    { "name": "X-API-Key", "value": "__YCLOUD_API_KEY__" },
+                    { "name": "Content-Type", "value": "application/json" }
+                  ],
+                  "qs": [],
+                  "bodyType": "raw",
+                  "parseResponse": true,
+                  "contentType": "application/json",
+                  "body": "{\"from\":\"__PHONE_NUMBER__\",\"to\":\"{{12.to}}\",\"type\":\"text\",\"text\":{\"body\":\"{{12.message}}\"}}"
+                },
+                "metadata": {
+                  "designer": { "x": 300, "y": 500 }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "readme": "## MessageHub - yCloud WhatsApp Integration\n\n### Para importar en Make.com:\n1. Ve a Scenarios > Import Blueprint\n2. Sube este archivo JSON\n3. Reemplaza los placeholders:\n   - __TEAM_ID__ -> Tu Team ID de Firebase\n   - __YCLOUD_API_KEY__ -> Tu API Key de yCloud\n   - __PHONE_NUMBER__ -> Tu numero de WhatsApp en yCloud\n4. Configura las conexiones de Firebase y OpenAI\n5. Activa el escenario"
 }
