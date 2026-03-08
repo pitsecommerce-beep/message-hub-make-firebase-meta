@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { MessageSquare, Users, ShoppingCart, TrendingUp, ArrowUpRight, Bot, Package, Copy, Check, DollarSign, Clock, BarChart3, UserCheck } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getContacts, getConversations, getOrders, getAIAgents, getTeam, getTeamUsers } from '@/services/firestore';
@@ -9,6 +10,7 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 
 export default function DashboardPage() {
+  const navigate = useNavigate();
   const { user, hasModule } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -122,14 +124,14 @@ export default function DashboardPage() {
   const avgTicket = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
   const stats = [
-    { label: 'Ingresos del mes', value: formatCurrency(monthlyRevenue), icon: <DollarSign size={20} />, color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 dark:text-emerald-400', show: true },
-    { label: 'Pedidos del mes', value: monthlyOrderCount, icon: <ShoppingCart size={20} />, color: 'text-amber-600 bg-amber-50 dark:bg-amber-900/30 dark:text-amber-400', show: true },
-    { label: 'Ingresos totales', value: formatCurrency(totalRevenue), icon: <TrendingUp size={20} />, color: 'text-violet-600 bg-violet-50 dark:bg-violet-900/30 dark:text-violet-400', show: true },
-    { label: 'Ticket promedio', value: formatCurrency(avgTicket), icon: <BarChart3 size={20} />, color: 'text-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:text-blue-400', show: totalOrders > 0 },
-    { label: 'Conversaciones abiertas', value: openConvos, icon: <MessageSquare size={20} />, color: 'text-primary-600 bg-primary-50 dark:bg-primary-900/30 dark:text-primary-400', show: hasModule('crm') },
-    { label: 'Contactos totales', value: contacts.length, icon: <Users size={20} />, color: 'text-teal-600 bg-teal-50 dark:bg-teal-900/30 dark:text-teal-400', show: hasModule('crm') },
-    { label: 'Pedidos pendientes', value: pendingOrders, icon: <Package size={20} />, color: 'text-orange-600 bg-orange-50 dark:bg-orange-900/30 dark:text-orange-400', show: true },
-    { label: 'Tiempo promedio respuesta', value: overallAvgResponseTime > 0 ? formatResponseTime(overallAvgResponseTime) : 'N/A', icon: <Clock size={20} />, color: 'text-rose-600 bg-rose-50 dark:bg-rose-900/30 dark:text-rose-400', show: hasModule('crm') },
+    { label: 'Ingresos del mes', value: formatCurrency(monthlyRevenue), icon: <DollarSign size={20} />, color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 dark:text-emerald-400', show: true, path: '/orders' },
+    { label: 'Pedidos del mes', value: monthlyOrderCount, icon: <ShoppingCart size={20} />, color: 'text-amber-600 bg-amber-50 dark:bg-amber-900/30 dark:text-amber-400', show: true, path: '/orders' },
+    { label: 'Ingresos totales', value: formatCurrency(totalRevenue), icon: <TrendingUp size={20} />, color: 'text-violet-600 bg-violet-50 dark:bg-violet-900/30 dark:text-violet-400', show: true, path: '/orders' },
+    { label: 'Ticket promedio', value: formatCurrency(avgTicket), icon: <BarChart3 size={20} />, color: 'text-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:text-blue-400', show: totalOrders > 0, path: '/orders' },
+    { label: 'Conversaciones abiertas', value: openConvos, icon: <MessageSquare size={20} />, color: 'text-primary-600 bg-primary-50 dark:bg-primary-900/30 dark:text-primary-400', show: hasModule('crm'), path: '/conversations' },
+    { label: 'Contactos totales', value: contacts.length, icon: <Users size={20} />, color: 'text-teal-600 bg-teal-50 dark:bg-teal-900/30 dark:text-teal-400', show: hasModule('crm'), path: '/contacts' },
+    { label: 'Pedidos pendientes', value: pendingOrders, icon: <Package size={20} />, color: 'text-orange-600 bg-orange-50 dark:bg-orange-900/30 dark:text-orange-400', show: true, path: hasModule('wms') ? '/warehouse' : '/orders' },
+    { label: 'Tiempo promedio respuesta', value: overallAvgResponseTime > 0 ? formatResponseTime(overallAvgResponseTime) : 'N/A', icon: <Clock size={20} />, color: 'text-rose-600 bg-rose-50 dark:bg-rose-900/30 dark:text-rose-400', show: hasModule('crm'), path: '/conversations' },
   ].filter(s => s.show);
 
   const handleCopyOrgCode = () => {
@@ -160,10 +162,10 @@ export default function DashboardPage() {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {stats.map((stat) => (
-          <div key={stat.label} className="card p-5 hover:shadow-md transition-shadow duration-200">
+          <div key={stat.label} onClick={() => navigate(stat.path)} className="card p-5 hover:shadow-md transition-shadow duration-200 cursor-pointer group">
             <div className="flex items-center justify-between mb-3">
               <div className={`w-10 h-10 rounded-lg ${stat.color} flex items-center justify-center`}>{stat.icon}</div>
-              <ArrowUpRight size={16} className="text-surface-400" />
+              <ArrowUpRight size={16} className="text-surface-400 group-hover:text-primary-500 transition-colors" />
             </div>
             <p className="text-2xl font-bold text-surface-900 dark:text-surface-100">{stat.value}</p>
             <p className="text-sm text-surface-500 mt-0.5">{stat.label}</p>
@@ -207,12 +209,17 @@ export default function DashboardPage() {
         {/* Recent conversations */}
         {hasModule('crm') && conversations.length > 0 && (
           <div className="card p-5">
-            <h3 className="text-sm font-semibold text-surface-800 dark:text-surface-200 mb-4 flex items-center gap-2">
-              <MessageSquare size={16} className="text-primary-500" /> Conversaciones recientes
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-surface-800 dark:text-surface-200 flex items-center gap-2">
+                <MessageSquare size={16} className="text-primary-500" /> Conversaciones recientes
+              </h3>
+              <button onClick={() => navigate('/conversations')} className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 flex items-center gap-1 transition-colors">
+                Ver todo <ArrowUpRight size={12} />
+              </button>
+            </div>
             <div className="space-y-3">
               {conversations.slice(0, 5).map((conv) => (
-                <div key={conv.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-surface-50 dark:hover:bg-surface-700 transition-colors">
+                <div key={conv.id} onClick={() => navigate('/conversations')} className="flex items-center gap-3 p-2 rounded-lg hover:bg-surface-50 dark:hover:bg-surface-700 transition-colors cursor-pointer">
                   <div className="w-9 h-9 rounded-full bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-400 flex items-center justify-center text-xs font-semibold flex-shrink-0">
                     {(conv.contact?.name || '?').charAt(0)}
                   </div>
@@ -232,12 +239,17 @@ export default function DashboardPage() {
         {/* Recent orders */}
         {orders.length > 0 && (
           <div className="card p-5">
-            <h3 className="text-sm font-semibold text-surface-800 dark:text-surface-200 mb-4 flex items-center gap-2">
-              <Package size={16} className="text-amber-500" /> Pedidos recientes
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-surface-800 dark:text-surface-200 flex items-center gap-2">
+                <Package size={16} className="text-amber-500" /> Pedidos recientes
+              </h3>
+              <button onClick={() => navigate('/orders')} className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 flex items-center gap-1 transition-colors">
+                Ver todo <ArrowUpRight size={12} />
+              </button>
+            </div>
             <div className="space-y-3">
               {orders.slice(0, 5).map((order) => (
-                <div key={order.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-surface-50 dark:hover:bg-surface-700 transition-colors">
+                <div key={order.id} onClick={() => navigate('/orders')} className="flex items-center gap-3 p-2 rounded-lg hover:bg-surface-50 dark:hover:bg-surface-700 transition-colors cursor-pointer">
                   <div className="w-9 h-9 rounded-full bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0">
                     <ShoppingCart size={16} />
                   </div>
@@ -255,12 +267,19 @@ export default function DashboardPage() {
         {/* AI Agents */}
         {hasModule('crm') && agents.length > 0 && (
           <div className="card p-5">
-            <h3 className="text-sm font-semibold text-surface-800 dark:text-surface-200 mb-4 flex items-center gap-2">
-              <Bot size={16} className="text-violet-500" /> Agentes de IA
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-surface-800 dark:text-surface-200 flex items-center gap-2">
+                <Bot size={16} className="text-violet-500" /> Agentes de IA
+              </h3>
+              {user?.role === 'manager' && (
+                <button onClick={() => navigate('/ai-agents')} className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 flex items-center gap-1 transition-colors">
+                  Gestionar <ArrowUpRight size={12} />
+                </button>
+              )}
+            </div>
             <div className="space-y-3">
               {agents.map(agent => (
-                <div key={agent.id} className="flex items-center justify-between p-3 rounded-lg bg-surface-50 dark:bg-surface-700">
+                <div key={agent.id} onClick={() => user?.role === 'manager' ? navigate('/ai-agents') : undefined} className={`flex items-center justify-between p-3 rounded-lg bg-surface-50 dark:bg-surface-700 ${user?.role === 'manager' ? 'cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-600 transition-colors' : ''}`}>
                   <div>
                     <p className="text-sm font-medium text-surface-800 dark:text-surface-200">{agent.name}</p>
                     <p className="text-xs text-surface-400">{agent.attendOutsideBusinessHours ? 'Atiende fuera de horario' : 'Solo horario comercial'}</p>
@@ -276,7 +295,12 @@ export default function DashboardPage() {
           <div className="card p-8 text-center col-span-2">
             <MessageSquare size={40} className="mx-auto mb-3 text-surface-300 dark:text-surface-600" />
             <h3 className="text-sm font-semibold text-surface-700 dark:text-surface-300 mb-1">Sin datos aún</h3>
-            <p className="text-xs text-surface-400">Conecta tus canales de Meta en Configuración para empezar a recibir mensajes.</p>
+            <p className="text-xs text-surface-400 mb-4">Conecta tus canales de Meta en Configuración para empezar a recibir mensajes.</p>
+            {user?.role === 'manager' && (
+              <button onClick={() => navigate('/settings')} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 transition-colors">
+                Ir a Configuración <ArrowUpRight size={14} />
+              </button>
+            )}
           </div>
         )}
       </div>
