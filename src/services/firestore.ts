@@ -25,6 +25,7 @@ import type {
   Team,
   TeamInvite,
   Product,
+  KnowledgeBase,
 } from '@/types';
 
 function teamCollection(teamId: string, col: string) {
@@ -353,6 +354,61 @@ export async function bulkImportData(teamId: string, collectionName: string, dat
     return imported;
   } catch (error) {
     handleFirestoreError(error, 'importar los datos');
+  }
+}
+
+// Knowledge Bases
+export function subscribeKnowledgeBases(
+  teamId: string,
+  callback: (kbs: KnowledgeBase[]) => void
+): Unsubscribe {
+  const q = query(teamCollection(teamId, 'knowledgeBases'), orderBy('createdAt', 'desc'));
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() }) as KnowledgeBase));
+  }, (error) => {
+    console.error('Error al escuchar bases de datos:', error);
+    callback([]);
+  });
+}
+
+export async function getKnowledgeBases(teamId: string): Promise<KnowledgeBase[]> {
+  try {
+    const q = query(teamCollection(teamId, 'knowledgeBases'), orderBy('createdAt', 'desc'));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as KnowledgeBase);
+  } catch (error) {
+    handleFirestoreError(error, 'cargar las bases de datos');
+  }
+}
+
+export async function createKnowledgeBase(teamId: string, data: Omit<KnowledgeBase, 'id'>): Promise<string> {
+  try {
+    const ref = await addDoc(teamCollection(teamId, 'knowledgeBases'), data);
+    return ref.id;
+  } catch (error) {
+    handleFirestoreError(error, 'crear la base de datos');
+  }
+}
+
+export async function deleteKnowledgeBase(teamId: string, id: string) {
+  try {
+    await deleteDoc(doc(db, 'teams', teamId, 'knowledgeBases', id));
+  } catch (error) {
+    handleFirestoreError(error, 'eliminar la base de datos');
+  }
+}
+
+export async function deleteKnowledgeBaseData(teamId: string, collectionName: string) {
+  try {
+    const snap = await getDocs(teamCollection(teamId, collectionName));
+    const batchSize = 400;
+    for (let i = 0; i < snap.docs.length; i += batchSize) {
+      const batch = writeBatch(db);
+      snap.docs.slice(i, i + batchSize).forEach(d => batch.delete(d.ref));
+      await batch.commit();
+    }
+  } catch (error) {
+    handleFirestoreError(error, 'eliminar los datos de la base de datos');
   }
 }
 

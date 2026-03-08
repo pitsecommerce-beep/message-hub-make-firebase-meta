@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Clock, Palette, Save, Webhook, MessageSquare, Bot, Plus, Trash2, Copy, Check } from 'lucide-react';
+import { Clock, Palette, Save, Webhook, MessageSquare, Bot, Plus, Trash2, Copy, Check, Image, Type } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getTeam, updateTeam } from '@/services/firestore';
 import { classNames } from '@/utils/helpers';
@@ -39,6 +39,8 @@ export default function SettingsPage() {
   const days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
   const [schedule, setSchedule] = useState(days.map((d, i) => ({ day: d, enabled: i < 6, start: '09:00', end: '18:00' })));
   const [copied, setCopied] = useState<string | null>(null);
+  const [brandName, setBrandName] = useState('Message Hub');
+  const [faviconUrl, setFaviconUrl] = useState('');
 
   useEffect(() => {
     if (!user?.teamId) return;
@@ -47,6 +49,8 @@ export default function SettingsPage() {
         setTeam(t);
         setTeamName(t.name || '');
         setPrimaryColor(t.settings?.primaryColor || '#1a85e6');
+        setBrandName(t.settings?.brandName || 'Message Hub');
+        setFaviconUrl(t.settings?.faviconUrl || '');
         setProviders(t.settings?.aiProviders || []);
         setTimezone(t.settings?.businessHours?.timezone || 'America/Mexico_City');
         const mc = t.settings?.metaConfig || {};
@@ -86,6 +90,8 @@ export default function SettingsPage() {
       name: teamName,
       settings: {
         primaryColor,
+        brandName: brandName.trim() || 'Message Hub',
+        faviconUrl: faviconUrl.trim(),
         aiProviders: providers,
         businessHours: {
           timezone,
@@ -120,10 +126,57 @@ export default function SettingsPage() {
 
         <div className="flex-1">
           {activeTab === 'general' && (
-            <div className="card p-6 space-y-5">
-              <h3 className="text-base font-semibold text-surface-800">General</h3>
-              <div><label className="block text-sm font-medium text-surface-700 mb-1">Nombre del equipo</label><input type="text" className="input-field max-w-md" value={teamName} onChange={e => setTeamName(e.target.value)} /></div>
-              <div><label className="block text-sm font-medium text-surface-700 mb-1">Color principal</label><div className="flex items-center gap-3"><input type="color" className="w-10 h-10 rounded-lg border cursor-pointer" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)} /><input type="text" className="input-field max-w-[140px]" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)} /></div></div>
+            <div className="space-y-6">
+              <div className="card p-6 space-y-5">
+                <h3 className="text-base font-semibold text-surface-800">General</h3>
+                <div><label className="block text-sm font-medium text-surface-700 mb-1">Nombre del equipo</label><input type="text" className="input-field max-w-md" value={teamName} onChange={e => setTeamName(e.target.value)} /></div>
+                <div><label className="block text-sm font-medium text-surface-700 mb-1">Color principal</label><div className="flex items-center gap-3"><input type="color" className="w-10 h-10 rounded-lg border cursor-pointer" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)} /><input type="text" className="input-field max-w-[140px]" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)} /></div></div>
+              </div>
+
+              <div className="card p-6 space-y-5">
+                <h3 className="text-base font-semibold text-surface-800 flex items-center gap-2"><Type size={18} /> Marca y branding</h3>
+                <p className="text-sm text-surface-500">Personaliza el nombre y el ícono que ve tu equipo en la aplicación.</p>
+
+                <div>
+                  <label className="block text-sm font-medium text-surface-700 mb-1">Nombre del producto</label>
+                  <input
+                    type="text"
+                    className="input-field max-w-md"
+                    placeholder="Message Hub"
+                    value={brandName}
+                    onChange={e => setBrandName(e.target.value)}
+                  />
+                  <p className="text-xs text-surface-400 mt-1">Este nombre reemplazará "Message Hub" en el menú lateral y la pestaña del navegador.</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-surface-700 mb-1">URL del ícono / favicon</label>
+                  <input
+                    type="url"
+                    className="input-field max-w-md"
+                    placeholder="https://tu-dominio.com/icon.png"
+                    value={faviconUrl}
+                    onChange={e => setFaviconUrl(e.target.value)}
+                  />
+                  <p className="text-xs text-surface-400 mt-1">URL de una imagen (PNG, SVG, ICO) que se usará como ícono en la pestaña del navegador y en el menú.</p>
+                </div>
+
+                {(brandName !== 'Message Hub' || faviconUrl) && (
+                  <div className="p-4 rounded-xl bg-surface-50 dark:bg-surface-700 border border-surface-200 dark:border-surface-600">
+                    <p className="text-xs text-surface-500 mb-3">Vista previa:</p>
+                    <div className="flex items-center gap-3">
+                      {faviconUrl ? (
+                        <img src={faviconUrl} alt="favicon" className="w-8 h-8 rounded-lg object-contain bg-white" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                      ) : (
+                        <div className="w-8 h-8 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
+                          <Image size={16} className="text-primary-600" />
+                        </div>
+                      )}
+                      <span className="text-sm font-semibold text-surface-800 dark:text-surface-200">{brandName || 'Message Hub'}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

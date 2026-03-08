@@ -27,6 +27,8 @@ export interface Team {
 export interface TeamSettings {
   primaryColor: string;
   logoUrl?: string;
+  brandName?: string;
+  faviconUrl?: string;
   aiProviders: AIProviderConfig[];
   businessHours: BusinessHours;
   metaConfig: MetaConfig;
@@ -204,13 +206,25 @@ export interface AIAgent {
   isActive: boolean;
   scope: AIAgentScope;
   selectedConversationIds: string[];
-  useBusinessHours: boolean;
-  customSchedule?: WeekSchedule;
+  knowledgeBaseIds: string[];
+  attendOutsideBusinessHours: boolean;
   maxTokens: number;
   temperature: number;
   createdAt: string;
   updatedAt: string;
   connectedChannels?: MessagePlatform[];
+}
+
+export interface KnowledgeBase {
+  id: string;
+  teamId: string;
+  name: string;
+  collectionName: string;
+  fileName: string;
+  recordCount: number;
+  headers: string[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ChannelConnection {

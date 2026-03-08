@@ -1,9 +1,11 @@
 import { NavLink } from 'react-router-dom';
 import { MessageSquare, Users, ShoppingCart, Bot, Package, Settings, LogOut, ChevronLeft, ChevronRight, LayoutDashboard, Link2, UsersRound, Database, Moon, Sun } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { classNames } from '@/utils/helpers';
+import { getTeam } from '@/services/firestore';
+import type { Team } from '@/types';
 
 interface NavItem {
   label: string;
@@ -30,6 +32,15 @@ export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const { user, signOut, hasModule, hasRole } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const [team, setTeam] = useState<Team | null>(null);
+
+  useEffect(() => {
+    if (!user?.teamId) return;
+    getTeam(user.teamId).then(setTeam).catch(() => {});
+  }, [user?.teamId]);
+
+  const brandName = team?.settings?.brandName || 'MessageHub';
+  const faviconUrl = team?.settings?.faviconUrl || '';
 
   const filteredItems = navItems.filter(item => {
     if (item.module && !hasModule(item.module)) return false;
@@ -45,10 +56,16 @@ export default function Sidebar() {
       <div className="h-16 flex items-center justify-between px-4 border-b border-surface-200 dark:border-surface-700">
         {!collapsed && (
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary-500 flex items-center justify-center">
+            {faviconUrl ? (
+              <img src={faviconUrl} alt="logo" className="w-8 h-8 rounded-lg object-contain" onError={(e) => {
+                (e.target as HTMLImageElement).style.display = 'none';
+                (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+              }} />
+            ) : null}
+            <div className={classNames('w-8 h-8 rounded-lg bg-primary-500 flex items-center justify-center', faviconUrl ? 'hidden' : '')}>
               <MessageSquare size={18} className="text-white" />
             </div>
-            <span className="font-semibold text-surface-800 dark:text-surface-100 text-sm">MessageHub</span>
+            <span className="font-semibold text-surface-800 dark:text-surface-100 text-sm truncate max-w-[140px]">{brandName}</span>
           </div>
         )}
         <button onClick={() => setCollapsed(!collapsed)} className="p-1.5 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-700 text-surface-400 transition-colors">
