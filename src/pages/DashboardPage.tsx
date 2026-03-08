@@ -64,13 +64,13 @@ export default function DashboardPage() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      <PageHeader title={`Bienvenido, ${user?.displayName?.split(' ')[0] || 'Usuario'}`} subtitle="Aqui tienes un resumen de tu actividad" />
+      <PageHeader title={`Bienvenido, ${user?.displayName?.split(' ')[0] || 'Usuario'}`} subtitle="Aquí tienes un resumen de tu actividad" />
 
       {user?.role === 'manager' && team?.orgCode && (
         <div className="mb-6 p-4 rounded-xl bg-gradient-to-r from-primary-50 to-blue-50 dark:from-primary-900/20 dark:to-blue-900/20 border border-primary-100 dark:border-primary-800 flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-surface-700 dark:text-surface-300">Codigo de organizacion</p>
-            <p className="text-xs text-surface-500">Comparte este codigo para que tu equipo se una</p>
+            <p className="text-sm font-medium text-surface-700 dark:text-surface-300">Código de organización</p>
+            <p className="text-xs text-surface-500">Comparte este código para que tu equipo se una</p>
           </div>
           <button onClick={handleCopyOrgCode} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white dark:bg-surface-800 border border-primary-200 dark:border-primary-700 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-colors">
             <span className="font-mono text-lg font-bold text-primary-700 dark:text-primary-400 tracking-wider">{team.orgCode}</span>
@@ -158,8 +158,8 @@ export default function DashboardPage() {
         {conversations.length === 0 && orders.length === 0 && (
           <div className="card p-8 text-center col-span-2">
             <MessageSquare size={40} className="mx-auto mb-3 text-surface-300 dark:text-surface-600" />
-            <h3 className="text-sm font-semibold text-surface-700 dark:text-surface-300 mb-1">Sin datos aun</h3>
-            <p className="text-xs text-surface-400">Conecta tus canales de Meta en Configuracion para empezar a recibir mensajes.</p>
+            <h3 className="text-sm font-semibold text-surface-700 dark:text-surface-300 mb-1">Sin datos aún</h3>
+            <p className="text-xs text-surface-400">Conecta tus canales de Meta en Configuración para empezar a recibir mensajes.</p>
           </div>
         )}
       </div>

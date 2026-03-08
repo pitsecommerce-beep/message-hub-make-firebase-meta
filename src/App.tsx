@@ -56,9 +56,9 @@ function AppRoutes() {
         <Route path="/conversations" element={<ModuleRoute module="crm"><ConversationsPage /></ModuleRoute>} />
         <Route path="/contacts" element={<ModuleRoute module="crm"><ContactsPage /></ModuleRoute>} />
         <Route path="/orders" element={<ModuleRoute module="crm"><OrdersPage /></ModuleRoute>} />
-        <Route path="/ai-agents" element={<ModuleRoute module="crm"><AIAgentsPage /></ModuleRoute>} />
-        <Route path="/connections" element={<ModuleRoute module="crm"><ConnectionsPage /></ModuleRoute>} />
-        <Route path="/databases" element={<ModuleRoute module="crm"><DatabasesPage /></ModuleRoute>} />
+        <Route path="/ai-agents" element={<RoleRoute roles={['manager']}><ModuleRoute module="crm"><AIAgentsPage /></ModuleRoute></RoleRoute>} />
+        <Route path="/connections" element={<RoleRoute roles={['manager']}><ModuleRoute module="crm"><ConnectionsPage /></ModuleRoute></RoleRoute>} />
+        <Route path="/databases" element={<RoleRoute roles={['manager']}><ModuleRoute module="crm"><DatabasesPage /></ModuleRoute></RoleRoute>} />
         <Route path="/warehouse" element={<ModuleRoute module="wms"><WarehousePage /></ModuleRoute>} />
         <Route path="/team" element={<RoleRoute roles={['manager']}><AdminPage /></RoleRoute>} />
         <Route path="/settings" element={<RoleRoute roles={['manager']}><SettingsPage /></RoleRoute>} />

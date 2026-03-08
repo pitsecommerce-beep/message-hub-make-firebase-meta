@@ -89,7 +89,7 @@ export default function AIAgentsPage() {
     const provider = team.settings?.aiProviders?.find(p => p.provider === testingAgent.providerId || p.id === testingAgent.providerId);
 
     if (!provider?.apiKey) {
-      setTestMessages(prev => [...prev, { role: 'assistant', content: 'No se encontro un proveedor de IA configurado con API Key. Ve a Configuracion > Proveedores IA para agregar uno.' }]);
+      setTestMessages(prev => [...prev, { role: 'assistant', content: 'No se encontró un proveedor de IA configurado con API Key. Ve a Configuración > Proveedores IA para agregar uno.' }]);
       setTestLoading(false);
       return;
     }
@@ -105,7 +105,7 @@ export default function AIAgentsPage() {
         body = {
           model: provider.model || 'gpt-4o-mini',
           messages: [
-            { role: 'system', content: testingAgent.systemPrompt || 'Eres un asistente util.' },
+            { role: 'system', content: testingAgent.systemPrompt || 'Eres un asistente útil.' },
             ...testMessages.map(m => ({ role: m.role, content: m.content })),
             { role: 'user', content: userMsg },
           ],
@@ -119,7 +119,7 @@ export default function AIAgentsPage() {
         headers['anthropic-dangerous-direct-browser-access'] = 'true';
         body = {
           model: provider.model || 'claude-sonnet-4-20250514',
-          system: testingAgent.systemPrompt || 'Eres un asistente util.',
+          system: testingAgent.systemPrompt || 'Eres un asistente útil.',
           messages: [
             ...testMessages.map(m => ({ role: m.role, content: m.content })),
             { role: 'user', content: userMsg },
@@ -146,9 +146,9 @@ export default function AIAgentsPage() {
   };
 
   const scopes: { value: AIAgentScope; label: string; desc: string }[] = [
-    { value: 'all', label: 'Todas las conversaciones', desc: 'Responde automaticamente en todas' },
-    { value: 'selected', label: 'Solo conversaciones seleccionadas', desc: 'Elige en cuales responde' },
-    { value: 'none', label: 'Desactivado', desc: 'No responde automaticamente' },
+    { value: 'all', label: 'Todas las conversaciones', desc: 'Responde automáticamente en todas' },
+    { value: 'selected', label: 'Solo conversaciones seleccionadas', desc: 'Elige en cuáles responde' },
+    { value: 'none', label: 'Desactivado', desc: 'No responde automáticamente' },
   ];
 
   const getCreativityLabel = (temp: number) => {
@@ -179,7 +179,7 @@ export default function AIAgentsPage() {
             <Settings2 size={18} className="text-amber-600 dark:text-amber-400 mt-0.5" />
             <div>
               <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Configura un proveedor de IA primero</p>
-              <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">Ve a Configuracion {'>'} Proveedores IA para agregar tu API Key de OpenAI, Anthropic u otro proveedor.</p>
+              <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">Ve a Configuración {'>'} Proveedores IA para agregar tu API Key de OpenAI, Anthropic u otro proveedor.</p>
             </div>
           </div>
         </div>
@@ -191,7 +191,7 @@ export default function AIAgentsPage() {
             <Bot size={32} className="text-violet-500" />
           </div>
           <h3 className="text-base font-semibold text-surface-800 dark:text-surface-200 mb-2">Crea tu primer agente de IA</h3>
-          <p className="text-sm text-surface-500 max-w-md mx-auto mb-4">Un agente de IA puede responder automaticamente a tus clientes por WhatsApp, Messenger o Instagram.</p>
+          <p className="text-sm text-surface-500 max-w-md mx-auto mb-4">Un agente de IA puede responder automáticamente a tus clientes por WhatsApp, Messenger o Instagram.</p>
           <button onClick={handleNew} className="btn-primary inline-flex items-center gap-2"><Sparkles size={16} /> Crear agente</button>
         </div>
       ) : (
@@ -237,7 +237,7 @@ export default function AIAgentsPage() {
             {/* Section tabs */}
             <div className="flex border-b border-surface-200 dark:border-surface-700 px-5">
               {[
-                { id: 'basic' as const, label: 'Informacion basica' },
+                { id: 'basic' as const, label: 'Información básica' },
                 { id: 'behavior' as const, label: 'Comportamiento' },
                 { id: 'advanced' as const, label: 'Opciones avanzadas' },
               ].map(tab => (
@@ -269,12 +269,12 @@ export default function AIAgentsPage() {
                       <option value="">Seleccionar proveedor...</option>
                       {providerOptions.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                     </select>
-                    <p className="text-xs text-surface-400 mt-1">Agrega proveedores en Configuracion {'>'} Proveedores IA</p>
+                    <p className="text-xs text-surface-400 mt-1">Agrega proveedores en Configuración {'>'} Proveedores IA</p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Instrucciones del agente</label>
-                    <p className="text-xs text-surface-400 mb-2">Describe como quieres que se comporte tu agente. Que personalidad tiene? Que informacion debe dar? Que no debe hacer?</p>
-                    <textarea className="input-field min-h-[150px] resize-y" placeholder="Ej: Eres un asistente amable de ventas para [tu empresa]. Ayudas a los clientes con informacion de productos, precios y disponibilidad. Siempre saludas cordialmente y ofreces ayuda adicional..." value={editingAgent.systemPrompt} onChange={e => setEditingAgent({ ...editingAgent, systemPrompt: e.target.value })} />
+                    <p className="text-xs text-surface-400 mb-2">Describe cómo quieres que se comporte tu agente. ¿Qué personalidad tiene? ¿Qué información debe dar? ¿Qué no debe hacer?</p>
+                    <textarea className="input-field min-h-[150px] resize-y" placeholder="Ej: Eres un asistente amable de ventas para [tu empresa]. Ayudas a los clientes con información de productos, precios y disponibilidad. Siempre saludas cordialmente y ofreces ayuda adicional..." value={editingAgent.systemPrompt} onChange={e => setEditingAgent({ ...editingAgent, systemPrompt: e.target.value })} />
                   </div>
                 </>
               )}
@@ -282,7 +282,7 @@ export default function AIAgentsPage() {
               {activeSection === 'behavior' && (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">En que conversaciones responde?</label>
+                    <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">¿En qué conversaciones responde?</label>
                     <div className="space-y-2">
                       {scopes.map(s => (
                         <button key={s.value} type="button" onClick={() => setEditingAgent({ ...editingAgent, scope: s.value })}
@@ -305,7 +305,7 @@ export default function AIAgentsPage() {
                     <input type="checkbox" className="w-4 h-4 rounded border-surface-300 dark:border-surface-600 text-primary-500" checked={editingAgent.useBusinessHours} onChange={e => setEditingAgent({ ...editingAgent, useBusinessHours: e.target.checked })} />
                     <div>
                       <span className="text-sm font-medium text-surface-700 dark:text-surface-300">Solo responder en horario comercial</span>
-                      <p className="text-xs text-surface-400">Configura tu horario en Configuracion {'>'} Horario</p>
+                      <p className="text-xs text-surface-400">Configura tu horario en Configuración {'>'} Horario</p>
                     </div>
                   </label>
                 </>
@@ -314,8 +314,8 @@ export default function AIAgentsPage() {
               {activeSection === 'advanced' && (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Largo maximo de respuesta</label>
-                    <p className="text-xs text-surface-400 mb-2">Cuantas palabras aproximadas puede usar el agente para responder</p>
+                    <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Largo máximo de respuesta</label>
+                    <p className="text-xs text-surface-400 mb-2">Cuántas palabras aproximadas puede usar el agente para responder</p>
                     <div className="flex items-center gap-4">
                       <input type="range" className="flex-1" min={100} max={2000} step={100} value={editingAgent.maxTokens} onChange={e => setEditingAgent({ ...editingAgent, maxTokens: Number(e.target.value) })} />
                       <span className="text-sm font-medium text-surface-700 dark:text-surface-300 w-24 text-right">~{Math.round(editingAgent.maxTokens * 0.75)} palabras</span>
@@ -324,7 +324,7 @@ export default function AIAgentsPage() {
 
                   <div>
                     <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Estilo de respuesta</label>
-                    <p className="text-xs text-surface-400 mb-2">Que tan creativo o preciso quieres que sea tu agente</p>
+                    <p className="text-xs text-surface-400 mb-2">Qué tan creativo o preciso quieres que sea tu agente</p>
                     <div className="flex items-center gap-4">
                       <span className="text-xs text-surface-400">Preciso</span>
                       <input type="range" className="flex-1" min={0} max={1} step={0.1} value={editingAgent.temperature} onChange={e => setEditingAgent({ ...editingAgent, temperature: Number(e.target.value) })} />
@@ -364,7 +364,7 @@ export default function AIAgentsPage() {
                 <div className="w-9 h-9 rounded-lg bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 flex items-center justify-center"><Bot size={18} /></div>
                 <div>
                   <h3 className="text-sm font-semibold text-surface-800 dark:text-surface-200">{testingAgent.name}</h3>
-                  <p className="text-xs text-surface-400">Conversacion de prueba</p>
+                  <p className="text-xs text-surface-400">Conversación de prueba</p>
                 </div>
               </div>
               <button onClick={() => setTestingAgent(null)} className="p-1 rounded hover:bg-surface-100 dark:hover:bg-surface-700 text-surface-400"><X size={18} /></button>
@@ -375,7 +375,7 @@ export default function AIAgentsPage() {
                 <div className="text-center py-12">
                   <Bot size={40} className="mx-auto mb-3 text-surface-300 dark:text-surface-600" />
                   <p className="text-sm text-surface-500">Escribe un mensaje para probar tu agente</p>
-                  <p className="text-xs text-surface-400 mt-1">La conversacion usara tu API Key configurada</p>
+                  <p className="text-xs text-surface-400 mt-1">La conversación usará tu API Key configurada</p>
                 </div>
               )}
               {testMessages.map((msg, i) => (

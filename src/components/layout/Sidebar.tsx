@@ -18,12 +18,12 @@ const navItems: NavItem[] = [
   { label: 'Conversaciones', path: '/conversations', icon: <MessageSquare size={20} />, module: 'crm' },
   { label: 'Contactos', path: '/contacts', icon: <Users size={20} />, module: 'crm' },
   { label: 'Pedidos', path: '/orders', icon: <ShoppingCart size={20} />, module: 'crm' },
-  { label: 'Bases de Datos', path: '/databases', icon: <Database size={20} />, module: 'crm' },
-  { label: 'Agente IA', path: '/ai-agents', icon: <Bot size={20} />, module: 'crm' },
-  { label: 'Conexiones', path: '/connections', icon: <Link2 size={20} />, module: 'crm' },
-  { label: 'Almacen', path: '/warehouse', icon: <Package size={20} />, module: 'wms' },
+  { label: 'Bases de Datos', path: '/databases', icon: <Database size={20} />, module: 'crm', roles: ['manager'] },
+  { label: 'Agente IA', path: '/ai-agents', icon: <Bot size={20} />, module: 'crm', roles: ['manager'] },
+  { label: 'Conexiones', path: '/connections', icon: <Link2 size={20} />, module: 'crm', roles: ['manager'] },
+  { label: 'Almacén', path: '/warehouse', icon: <Package size={20} />, module: 'wms' },
   { label: 'Equipo', path: '/team', icon: <UsersRound size={20} />, roles: ['manager'] },
-  { label: 'Configuracion', path: '/settings', icon: <Settings size={20} />, roles: ['manager'] },
+  { label: 'Configuración', path: '/settings', icon: <Settings size={20} />, roles: ['manager'] },
 ];
 
 export default function Sidebar() {
@@ -79,10 +79,10 @@ export default function Sidebar() {
             'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 text-surface-600 dark:text-surface-400 hover:bg-surface-50 dark:hover:bg-surface-700',
             collapsed ? 'justify-center' : ''
           )}
-          title={theme === 'dark' ? 'Modo claro' : 'Modo noche'}
+          title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
         >
           {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-          {!collapsed && <span>{theme === 'dark' ? 'Modo claro' : 'Modo noche'}</span>}
+          {!collapsed && <span>{theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}</span>}
         </button>
 
         <div className={classNames('flex items-center', collapsed ? 'justify-center' : 'gap-3')}>
@@ -96,7 +96,7 @@ export default function Sidebar() {
             </div>
           )}
           {!collapsed && (
-            <button onClick={signOut} className="p-1.5 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-700 text-surface-400 transition-colors" title="Cerrar sesion">
+            <button onClick={signOut} className="p-1.5 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-700 text-surface-400 transition-colors" title="Cerrar sesión">
               <LogOut size={16} />
             </button>
           )}

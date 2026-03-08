@@ -51,7 +51,7 @@ export default function ContactsPage() {
           <div className="flex items-center gap-3 mb-4">
             <div className="relative flex-1 max-w-md">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-400" />
-              <input type="text" placeholder="Buscar por nombre, telefono o empresa..." className="input-field pl-9" value={search} onChange={e => setSearch(e.target.value)} />
+              <input type="text" placeholder="Buscar por nombre, teléfono o empresa..." className="input-field pl-9" value={search} onChange={e => setSearch(e.target.value)} />
             </div>
             {allTags.length > 0 && (
               <select className="input-field w-auto" value={tagFilter} onChange={e => setTagFilter(e.target.value)}>
@@ -65,7 +65,7 @@ export default function ContactsPage() {
           {contacts.length === 0 ? (
             <div className="card p-8 text-center">
               <MessageSquare size={40} className="mx-auto mb-3 text-surface-300" />
-              <p className="text-sm text-surface-400 dark:text-surface-500">Sin contactos aun. Crea tu primer contacto o carga un Excel desde Bases de Datos.</p>
+              <p className="text-sm text-surface-400 dark:text-surface-500">Sin contactos aún. Crea tu primer contacto o carga un Excel desde Bases de Datos.</p>
             </div>
           ) : (
             <div className="card overflow-hidden">
@@ -75,9 +75,9 @@ export default function ContactsPage() {
                     <th className="text-left text-xs font-medium text-surface-500 px-4 py-3">Contacto</th>
                     <th className="text-left text-xs font-medium text-surface-500 px-4 py-3">Empresa</th>
                     <th className="text-left text-xs font-medium text-surface-500 px-4 py-3">Plataforma</th>
-                    <th className="text-left text-xs font-medium text-surface-500 px-4 py-3">Telefono</th>
+                    <th className="text-left text-xs font-medium text-surface-500 px-4 py-3">Teléfono</th>
                     <th className="text-left text-xs font-medium text-surface-500 px-4 py-3">Etiquetas</th>
-                    <th className="text-left text-xs font-medium text-surface-500 px-4 py-3">Ultimo mensaje</th>
+                    <th className="text-left text-xs font-medium text-surface-500 px-4 py-3">Último mensaje</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -217,7 +217,7 @@ function NewContactModal({ teamId, onClose, onSaved }: { teamId: string; onClose
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Telefono</label>
+              <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Teléfono</label>
               <input type="tel" className="input-field" placeholder="+52 55 1234 5678" value={phone} onChange={e => setPhone(e.target.value)} />
             </div>
             <div>
@@ -247,8 +247,8 @@ function NewContactModal({ teamId, onClose, onSaved }: { teamId: string; onClose
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Direccion</label>
-            <input type="text" className="input-field" placeholder="Calle, Numero, Colonia, Ciudad, CP" value={address} onChange={e => setAddress(e.target.value)} />
+            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Dirección</label>
+            <input type="text" className="input-field" placeholder="Calle, Número, Colonia, Ciudad, CP" value={address} onChange={e => setAddress(e.target.value)} />
           </div>
 
           <div>
