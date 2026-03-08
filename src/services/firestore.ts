@@ -31,6 +31,13 @@ function teamCollection(teamId: string, col: string) {
   return collection(db, 'teams', teamId, col);
 }
 
+// Strip undefined values from an object so Firestore doesn't reject them
+function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([, v]) => v !== undefined)
+  ) as T;
+}
+
 function handleFirestoreError(error: unknown, operacion: string): never {
   const err = error as { code?: string; message?: string };
   const code = err.code || '';
@@ -54,6 +61,19 @@ function handleFirestoreError(error: unknown, operacion: string): never {
 }
 
 // Contacts
+export function subscribeContacts(
+  teamId: string,
+  callback: (contacts: Contact[]) => void
+): Unsubscribe {
+  const q = query(teamCollection(teamId, 'contacts'), orderBy('lastMessageAt', 'desc'));
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() }) as Contact));
+  }, (error) => {
+    console.error('Error al escuchar contactos:', error);
+    callback([]);
+  });
+}
+
 export async function getContacts(teamId: string): Promise<Contact[]> {
   try {
     const q = query(teamCollection(teamId, 'contacts'), orderBy('lastMessageAt', 'desc'));
@@ -110,6 +130,21 @@ export async function getConversations(teamId: string): Promise<Conversation[]> 
     return snap.docs.map(d => ({ id: d.id, ...d.data() }) as Conversation);
   } catch (error) {
     handleFirestoreError(error, 'cargar las conversaciones');
+  }
+}
+
+export async function findConversationByContact(teamId: string, contactId: string, platform: string): Promise<Conversation | null> {
+  try {
+    const q = query(
+      teamCollection(teamId, 'conversations'),
+      where('contactId', '==', contactId),
+      where('platform', '==', platform)
+    );
+    const snap = await getDocs(q);
+    if (snap.empty) return null;
+    return { id: snap.docs[0].id, ...snap.docs[0].data() } as Conversation;
+  } catch {
+    return null;
   }
 }
 
@@ -269,7 +304,7 @@ export async function bulkImportProducts(teamId: string, products: Omit<Product,
       const chunk = products.slice(i, i + batchSize);
       chunk.forEach(product => {
         const ref = doc(teamCollection(teamId, 'products'));
-        batch.set(ref, product);
+        batch.set(ref, stripUndefined(product as unknown as Record<string, unknown>));
       });
       await batch.commit();
       imported += chunk.length;
@@ -289,7 +324,7 @@ export async function bulkImportContacts(teamId: string, contacts: Omit<Contact,
       const chunk = contacts.slice(i, i + batchSize);
       chunk.forEach(contact => {
         const ref = doc(teamCollection(teamId, 'contacts'));
-        batch.set(ref, contact);
+        batch.set(ref, stripUndefined(contact as unknown as Record<string, unknown>));
       });
       await batch.commit();
       imported += chunk.length;
@@ -310,7 +345,7 @@ export async function bulkImportData(teamId: string, collectionName: string, dat
       const chunk = data.slice(i, i + batchSize);
       chunk.forEach(item => {
         const ref = doc(teamCollection(teamId, collectionName));
-        batch.set(ref, item);
+        batch.set(ref, stripUndefined(item as Record<string, unknown>));
       });
       await batch.commit();
       imported += chunk.length;
