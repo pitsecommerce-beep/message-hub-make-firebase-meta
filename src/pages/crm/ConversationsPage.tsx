@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Search, Send, Bot, Phone, MoreVertical, Filter, Paperclip, Smile, Check, CheckCheck, Clock, ShoppingCart, User, X, MessageSquare, Plus, UserPlus, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { subscribeConversations, subscribeMessages, sendMessage as sendFirestoreMessage, updateConversation, getContacts, createContact, createConversation } from '@/services/firestore';
+import { subscribeConversations, subscribeContacts, subscribeMessages, sendMessage as sendFirestoreMessage, updateConversation, getContacts, createContact, createConversation, findConversationByContact } from '@/services/firestore';
 import { formatMessageTime, classNames, getPlatformLabel, getInitials } from '@/utils/helpers';
 import PlatformIcon from '@/components/shared/PlatformIcon';
 import type { Conversation, Message, MessagePlatform, Contact } from '@/types';
@@ -11,7 +11,8 @@ type FilterStatus = 'all' | 'open' | 'pending' | 'closed';
 
 export default function ConversationsPage() {
   const { user } = useAuth();
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [rawConversations, setRawConversations] = useState<Conversation[]>([]);
+  const [contactsMap, setContactsMap] = useState<Record<string, Contact>>({});
   const [selectedConvo, setSelectedConvo] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -23,12 +24,38 @@ export default function ConversationsPage() {
   const [showNewConvoModal, setShowNewConvoModal] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Subscribe to contacts for enriching conversations
+  useEffect(() => {
+    if (!user?.teamId) return;
+    const unsub = subscribeContacts(user.teamId, (contacts) => {
+      const map: Record<string, Contact> = {};
+      contacts.forEach(c => { map[c.id] = c; });
+      setContactsMap(map);
+    });
+    return () => unsub();
+  }, [user?.teamId]);
+
   // Subscribe to conversations
   useEffect(() => {
     if (!user?.teamId) return;
-    const unsub = subscribeConversations(user.teamId, setConversations);
+    const unsub = subscribeConversations(user.teamId, setRawConversations);
     return () => unsub();
   }, [user?.teamId]);
+
+  // Enrich conversations with contact data
+  const conversations = rawConversations.map(convo => ({
+    ...convo,
+    contact: contactsMap[convo.contactId] || convo.contact,
+  }));
+
+  // Keep selectedConvo in sync with enriched conversations
+  useEffect(() => {
+    if (!selectedConvo) return;
+    const updated = conversations.find(c => c.id === selectedConvo.id);
+    if (updated && (updated.contact?.name !== selectedConvo.contact?.name || updated.lastMessage?.content !== selectedConvo.lastMessage?.content)) {
+      setSelectedConvo(updated);
+    }
+  }, [conversations, selectedConvo]);
 
   // Subscribe to messages when selecting a conversation
   useEffect(() => {
@@ -409,17 +436,29 @@ function NewConversationModal({
         contactPhone = selectedContact!.phone;
       }
 
-      // Create conversation
-      const convoId = await createConversation(teamId, {
-        teamId,
-        contactId,
-        platform: contactPlatform,
-        status: 'open',
-        aiEnabled: false,
-        unreadCount: 0,
-        createdAt: now,
-        updatedAt: now,
-      } as Omit<Conversation, 'id'>);
+      // Check for existing conversation with same contact and platform
+      const existingConvo = await findConversationByContact(teamId, contactId, contactPlatform);
+      let convoId: string;
+
+      if (existingConvo) {
+        convoId = existingConvo.id;
+        // Reopen the conversation if it was closed
+        if (existingConvo.status === 'closed') {
+          await updateConversation(teamId, convoId, { status: 'open', updatedAt: now });
+        }
+      } else {
+        // Create conversation
+        convoId = await createConversation(teamId, {
+          teamId,
+          contactId,
+          platform: contactPlatform,
+          status: 'open',
+          aiEnabled: false,
+          unreadCount: 0,
+          createdAt: now,
+          updatedAt: now,
+        } as Omit<Conversation, 'id'>);
+      }
 
       // Send first message if provided
       if (firstMessage.trim()) {
