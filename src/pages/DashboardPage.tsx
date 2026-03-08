@@ -56,7 +56,6 @@ export default function DashboardPage() {
 
   const openConvos = conversations.filter(c => c.status === 'open').length;
   const pendingOrders = orders.filter(o => ['new', 'confirmed', 'processing'].includes(o.status)).length;
-  const completedOrders = orders.filter(o => o.status === 'delivered');
   const totalRevenue = orders.filter(o => o.status !== 'cancelled' && o.status !== 'returned').reduce((s, o) => s + (o.total || 0), 0);
   const totalOrders = orders.filter(o => o.status !== 'cancelled' && o.status !== 'returned').length;
 
