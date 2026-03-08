@@ -1,7 +1,26 @@
-import { useState, useEffect } from 'react';
-import { Search, Plus, List, LayoutGrid, Eye, X, MapPin, Truck, Trash2, Save, Loader2 } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Search, Plus, List, LayoutGrid, Eye, X, MapPin, Truck, Trash2, Save, Loader2, GripVertical, Package, ChevronRight } from 'lucide-react';
+import {
+  DndContext,
+  DragOverlay,
+  closestCorners,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragStartEvent,
+  type DragEndEvent,
+  type DragOverEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { useDroppable } from '@dnd-kit/core';
 import { useAuth } from '@/contexts/AuthContext';
-import { getOrders, getContacts, getProducts, createOrder } from '@/services/firestore';
+import { getOrders, getContacts, getProducts, createOrder, updateOrder } from '@/services/firestore';
 import { formatCurrency, formatFullDate, getOrderStatusLabel, getOrderStatusColor, classNames, getInitials, generateOrderNumber } from '@/utils/helpers';
 import PageHeader from '@/components/shared/PageHeader';
 import EmptyState from '@/components/shared/EmptyState';
@@ -10,25 +29,179 @@ import { ORDER_FUNNEL_STAGES } from '@/types';
 
 type ViewMode = 'list' | 'funnel';
 
-const FUNNEL_COLORS: Record<OrderStatus, string> = {
-  new: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800', confirmed: 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800', processing: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800',
-  packed: 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800', shipped: 'bg-cyan-50 dark:bg-cyan-900/20 border-cyan-200 dark:border-cyan-800', delivered: 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800',
-  cancelled: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800', returned: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800',
+const FUNNEL_COLORS: Record<OrderStatus, { bg: string; header: string; border: string; dot: string }> = {
+  new: { bg: 'bg-blue-50/50 dark:bg-blue-950/20', header: 'text-blue-700 dark:text-blue-400', border: 'border-blue-200 dark:border-blue-800', dot: 'bg-blue-500' },
+  confirmed: { bg: 'bg-indigo-50/50 dark:bg-indigo-950/20', header: 'text-indigo-700 dark:text-indigo-400', border: 'border-indigo-200 dark:border-indigo-800', dot: 'bg-indigo-500' },
+  processing: { bg: 'bg-amber-50/50 dark:bg-amber-950/20', header: 'text-amber-700 dark:text-amber-400', border: 'border-amber-200 dark:border-amber-800', dot: 'bg-amber-500' },
+  packed: { bg: 'bg-orange-50/50 dark:bg-orange-950/20', header: 'text-orange-700 dark:text-orange-400', border: 'border-orange-200 dark:border-orange-800', dot: 'bg-orange-500' },
+  shipped: { bg: 'bg-cyan-50/50 dark:bg-cyan-950/20', header: 'text-cyan-700 dark:text-cyan-400', border: 'border-cyan-200 dark:border-cyan-800', dot: 'bg-cyan-500' },
+  delivered: { bg: 'bg-emerald-50/50 dark:bg-emerald-950/20', header: 'text-emerald-700 dark:text-emerald-400', border: 'border-emerald-200 dark:border-emerald-800', dot: 'bg-emerald-500' },
+  cancelled: { bg: 'bg-red-50/50 dark:bg-red-950/20', header: 'text-red-700 dark:text-red-400', border: 'border-red-200 dark:border-red-800', dot: 'bg-red-500' },
+  returned: { bg: 'bg-red-50/50 dark:bg-red-950/20', header: 'text-red-700 dark:text-red-400', border: 'border-red-200 dark:border-red-800', dot: 'bg-red-500' },
 };
-const FUNNEL_HEADER_COLORS: Record<OrderStatus, string> = {
-  new: 'text-blue-700 dark:text-blue-400', confirmed: 'text-indigo-700 dark:text-indigo-400', processing: 'text-amber-700 dark:text-amber-400', packed: 'text-orange-700 dark:text-orange-400',
-  shipped: 'text-cyan-700 dark:text-cyan-400', delivered: 'text-emerald-700 dark:text-emerald-400', cancelled: 'text-red-700 dark:text-red-400', returned: 'text-red-700 dark:text-red-400',
-};
+
+// --- Draggable Card ---
+function OrderCard({ order, onClick }: { order: Order; onClick: () => void }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: order.id, data: { order } });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={classNames(
+        'bg-white dark:bg-surface-800 rounded-xl border border-surface-200 dark:border-surface-700 shadow-sm cursor-grab active:cursor-grabbing transition-all hover:shadow-md group',
+        isDragging ? 'opacity-40 scale-95 shadow-lg ring-2 ring-primary-400' : ''
+      )}
+    >
+      <div className="p-3.5">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-2.5">
+          <div className="flex items-center gap-2">
+            <button {...attributes} {...listeners} className="p-0.5 rounded text-surface-300 hover:text-surface-500 dark:text-surface-500 dark:hover:text-surface-300 opacity-0 group-hover:opacity-100 transition-opacity">
+              <GripVertical size={14} />
+            </button>
+            <span className="text-xs font-bold text-primary-600 dark:text-primary-400 tracking-wide">{order.orderNumber}</span>
+          </div>
+          <button onClick={(e) => { e.stopPropagation(); onClick(); }} className="p-1 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-700 text-surface-400 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Eye size={14} />
+          </button>
+        </div>
+
+        {/* Client */}
+        <div className="flex items-center gap-2 mb-3" onClick={onClick}>
+          <div className="w-7 h-7 rounded-full bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-400 flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+            {getInitials(order.contact?.name || '?')}
+          </div>
+          <span className="text-sm font-medium text-surface-700 dark:text-surface-300 truncate">{order.contact?.name || 'Sin cliente'}</span>
+        </div>
+
+        {/* Items preview */}
+        <div className="flex items-center gap-1.5 mb-3 text-xs text-surface-400" onClick={onClick}>
+          <Package size={12} />
+          <span>{order.items?.length || 0} {(order.items?.length || 0) === 1 ? 'producto' : 'productos'}</span>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between pt-2.5 border-t border-surface-100 dark:border-surface-700" onClick={onClick}>
+          <span className="text-[10px] text-surface-400">{formatFullDate(order.createdAt)}</span>
+          <span className="text-sm font-bold text-surface-800 dark:text-surface-200">{formatCurrency(order.total)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- Card overlay during drag ---
+function OrderCardOverlay({ order }: { order: Order }) {
+  return (
+    <div className="bg-white dark:bg-surface-800 rounded-xl border-2 border-primary-400 shadow-2xl w-72 rotate-2">
+      <div className="p-3.5">
+        <div className="flex items-center justify-between mb-2.5">
+          <span className="text-xs font-bold text-primary-600 tracking-wide">{order.orderNumber}</span>
+        </div>
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-7 h-7 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+            {getInitials(order.contact?.name || '?')}
+          </div>
+          <span className="text-sm font-medium text-surface-700 truncate">{order.contact?.name || 'Sin cliente'}</span>
+        </div>
+        <div className="flex items-center justify-between pt-2.5 border-t border-surface-100">
+          <span className="text-[10px] text-surface-400">{formatFullDate(order.createdAt)}</span>
+          <span className="text-sm font-bold text-surface-800">{formatCurrency(order.total)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- Droppable Column ---
+function StageColumn({
+  stage,
+  orders,
+  onSelectOrder,
+}: {
+  stage: OrderStatus;
+  orders: Order[];
+  onSelectOrder: (order: Order) => void;
+}) {
+  const colors = FUNNEL_COLORS[stage];
+  const { setNodeRef, isOver } = useDroppable({ id: stage });
+
+  return (
+    <div className="flex-shrink-0 w-72 flex flex-col h-full">
+      {/* Column header */}
+      <div className={classNames('rounded-t-xl border-t border-x px-4 py-3', colors.bg, colors.border)}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className={classNames('w-2.5 h-2.5 rounded-full', colors.dot)} />
+            <h3 className={classNames('text-sm font-semibold', colors.header)}>
+              {getOrderStatusLabel(stage)}
+            </h3>
+          </div>
+          <span className="text-xs font-medium text-surface-500 bg-white/80 dark:bg-surface-800/80 px-2 py-0.5 rounded-full min-w-[24px] text-center">
+            {orders.length}
+          </span>
+        </div>
+      </div>
+
+      {/* Cards area */}
+      <div
+        ref={setNodeRef}
+        className={classNames(
+          'flex-1 rounded-b-xl border-b border-x p-2 space-y-2.5 overflow-y-auto transition-colors min-h-[120px]',
+          colors.border,
+          isOver ? 'bg-primary-50/50 dark:bg-primary-900/10 ring-2 ring-primary-300 ring-inset' : 'bg-surface-50/50 dark:bg-surface-900/30'
+        )}
+      >
+        <SortableContext items={orders.map(o => o.id)} strategy={verticalListSortingStrategy}>
+          {orders.map(order => (
+            <OrderCard
+              key={order.id}
+              order={order}
+              onClick={() => onSelectOrder(order)}
+            />
+          ))}
+        </SortableContext>
+        {orders.length === 0 && (
+          <div className={classNames(
+            'text-center py-8 text-xs text-surface-400 border-2 border-dashed rounded-lg transition-colors',
+            isOver ? 'border-primary-300 text-primary-500' : 'border-surface-200 dark:border-surface-700'
+          )}>
+            {isOver ? 'Soltar aquí' : 'Sin pedidos'}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function OrdersPage() {
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
-  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [viewMode, setViewMode] = useState<ViewMode>('funnel');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [showNewForm, setShowNewForm] = useState(false);
+  const [activeOrder, setActiveOrder] = useState<Order | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor)
+  );
 
   const loadOrders = async () => {
     if (!user?.teamId) return;
@@ -39,6 +212,53 @@ export default function OrdersPage() {
 
   useEffect(() => { loadOrders(); }, [user?.teamId]);
 
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    const order = orders.find(o => o.id === event.active.id);
+    if (order) setActiveOrder(order);
+  }, [orders]);
+
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveOrder(null);
+    if (!over || !user?.teamId) return;
+
+    const orderId = active.id as string;
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+
+    // Determine target stage - "over" can be a column id (stage) or another card
+    let targetStage: OrderStatus | undefined;
+
+    if (ORDER_FUNNEL_STAGES.includes(over.id as OrderStatus)) {
+      targetStage = over.id as OrderStatus;
+    } else {
+      // Dropped on a card - find what stage that card is in
+      const overOrder = orders.find(o => o.id === over.id);
+      if (overOrder) targetStage = overOrder.status;
+    }
+
+    if (!targetStage || targetStage === order.status) return;
+
+    // Optimistic update
+    setOrders(prev => prev.map(o =>
+      o.id === orderId ? { ...o, status: targetStage, updatedAt: new Date().toISOString() } : o
+    ));
+
+    try {
+      await updateOrder(user.teamId, orderId, {
+        status: targetStage,
+        updatedAt: new Date().toISOString(),
+      });
+    } catch {
+      // Revert on error
+      loadOrders();
+    }
+  }, [orders, user?.teamId]);
+
+  const handleDragOver = useCallback((_event: DragOverEvent) => {
+    // Visual feedback handled by isOver in StageColumn
+  }, []);
+
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>;
 
   const filtered = orders.filter(o => {
@@ -47,7 +267,10 @@ export default function OrdersPage() {
     return true;
   });
 
-  const funnelData = ORDER_FUNNEL_STAGES.map(stage => ({ stage, orders: orders.filter(o => o.status === stage) }));
+  const funnelData = ORDER_FUNNEL_STAGES.map(stage => ({
+    stage,
+    orders: orders.filter(o => o.status === stage),
+  }));
 
   return (
     <div className="flex h-full">
@@ -94,33 +317,84 @@ export default function OrdersPage() {
               </table>
             </div>
           ) : (
-            <div className="flex gap-4 h-full overflow-x-auto pb-2">
-              {funnelData.map(({ stage, orders: stageOrders }) => (
-                <div key={stage} className="flex-shrink-0 w-72">
-                  <div className={`rounded-xl border ${FUNNEL_COLORS[stage]} p-3`}>
-                    <div className="flex items-center justify-between mb-3"><h3 className={`text-sm font-semibold ${FUNNEL_HEADER_COLORS[stage]}`}>{getOrderStatusLabel(stage)}</h3><span className="text-xs text-surface-500 bg-white/80 dark:bg-surface-800/80 px-2 py-0.5 rounded-full">{stageOrders.length}</span></div>
-                    <div className="space-y-2">
-                      {stageOrders.map(order => (
-                        <div key={order.id} className="bg-white dark:bg-surface-800 rounded-lg p-3 border border-surface-200 dark:border-surface-700 shadow-sm cursor-pointer hover:shadow-md transition-shadow" onClick={() => setSelectedOrder(order)}>
-                          <div className="flex items-center justify-between mb-2"><span className="text-xs font-medium text-primary-600">{order.orderNumber}</span><span className="text-sm font-semibold text-surface-800 dark:text-surface-200">{formatCurrency(order.total)}</span></div>
-                          <div className="text-xs text-surface-400">{order.items?.length || 0} items</div>
-                        </div>
-                      ))}
-                      {stageOrders.length === 0 && <div className="text-center py-8 text-xs text-surface-400">Sin pedidos</div>}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCorners}
+              onDragStart={handleDragStart}
+              onDragOver={handleDragOver}
+              onDragEnd={handleDragEnd}
+            >
+              <div className="flex gap-4 h-full overflow-x-auto pb-2">
+                {funnelData.map(({ stage, orders: stageOrders }) => (
+                  <StageColumn
+                    key={stage}
+                    stage={stage}
+                    orders={stageOrders}
+                    onSelectOrder={setSelectedOrder}
+                  />
+                ))}
+              </div>
+              <DragOverlay dropAnimation={{ duration: 200, easing: 'ease' }}>
+                {activeOrder ? <OrderCardOverlay order={activeOrder} /> : null}
+              </DragOverlay>
+            </DndContext>
           )}
         </div>
       </div>
 
+      {/* Order detail panel */}
       {selectedOrder && (
         <div className="w-96 border-l border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 overflow-y-auto flex-shrink-0">
           <div className="p-5">
             <div className="flex items-center justify-between mb-4"><h3 className="font-semibold text-surface-800 dark:text-surface-200">Detalle</h3><button onClick={() => setSelectedOrder(null)} className="p-1 rounded hover:bg-surface-100 dark:hover:bg-surface-700 text-surface-400"><X size={16} /></button></div>
             <div className="flex items-center justify-between mb-4"><span className="text-lg font-bold text-primary-600">{selectedOrder.orderNumber}</span><span className={getOrderStatusColor(selectedOrder.status)}>{getOrderStatusLabel(selectedOrder.status)}</span></div>
+
+            {/* Quick status change */}
+            <div className="mb-5">
+              <label className="block text-xs font-medium text-surface-400 mb-2">Mover a etapa</label>
+              <div className="flex flex-wrap gap-1.5">
+                {ORDER_FUNNEL_STAGES.map(stage => {
+                  const colors = FUNNEL_COLORS[stage];
+                  const isActive = selectedOrder.status === stage;
+                  return (
+                    <button
+                      key={stage}
+                      onClick={async () => {
+                        if (isActive || !user?.teamId) return;
+                        const updated = { ...selectedOrder, status: stage, updatedAt: new Date().toISOString() };
+                        setSelectedOrder(updated);
+                        setOrders(prev => prev.map(o => o.id === selectedOrder.id ? updated : o));
+                        await updateOrder(user.teamId, selectedOrder.id, { status: stage, updatedAt: new Date().toISOString() }).catch(() => loadOrders());
+                      }}
+                      className={classNames(
+                        'text-[10px] px-2 py-1 rounded-full font-medium transition-all flex items-center gap-1',
+                        isActive
+                          ? `${colors.bg} ${colors.header} ring-1 ${colors.border}`
+                          : 'bg-surface-100 dark:bg-surface-700 text-surface-400 hover:text-surface-600 dark:hover:text-surface-300'
+                      )}
+                    >
+                      {isActive && <div className={classNames('w-1.5 h-1.5 rounded-full', colors.dot)} />}
+                      {getOrderStatusLabel(stage)}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Client info */}
+            {selectedOrder.contact && (
+              <div className="mb-5 p-3 rounded-lg bg-surface-50 dark:bg-surface-700 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-400 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                  {getInitials(selectedOrder.contact.name)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-surface-800 dark:text-surface-200 truncate">{selectedOrder.contact.name}</p>
+                  {selectedOrder.contact.phone && <p className="text-xs text-surface-400">{selectedOrder.contact.phone}</p>}
+                </div>
+                <ChevronRight size={14} className="text-surface-300" />
+              </div>
+            )}
+
             <div className="mb-5"><h4 className="text-xs font-medium text-surface-400 mb-2">Productos</h4><div className="space-y-2">{(selectedOrder.items || []).map(item => (<div key={item.id} className="flex items-center justify-between p-2 rounded-lg bg-surface-50 dark:bg-surface-700"><div><p className="text-sm font-medium text-surface-800 dark:text-surface-200">{item.name}</p><p className="text-xs text-surface-400">{item.sku && `SKU: ${item.sku} | `}{item.quantity} x {formatCurrency(item.unitPrice)}</p></div><span className="text-sm font-medium text-surface-700 dark:text-surface-300">{formatCurrency(item.total)}</span></div>))}</div></div>
             <div className="mb-5 p-3 rounded-lg bg-surface-50 dark:bg-surface-700 space-y-1.5 text-sm">
               <div className="flex justify-between text-surface-600 dark:text-surface-400"><span>Subtotal</span><span>{formatCurrency(selectedOrder.subtotal)}</span></div>

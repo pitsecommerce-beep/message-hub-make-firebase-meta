@@ -374,6 +374,157 @@
                 "metadata": {
                   "designer": { "x": 300, "y": 500 }
                 }
+              },
+              {
+                "id": 15,
+                "module": "google-firebase-firestore:updateDocument",
+                "version": 3,
+                "parameters": {},
+                "mapper": {
+                  "documentId": "teams/{{12.teamId}}/messages/{{15.`__name__`}}",
+                  "data": "{\"status\":\"delivered\"}"
+                },
+                "metadata": {
+                  "designer": { "x": 600, "y": 500 },
+                  "comment": "Actualiza el status del mensaje a delivered despues de enviar por yCloud"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 16,
+        "module": "gateway:CustomWebHook",
+        "version": 1,
+        "parameters": {
+          "hook": {
+            "label": "CRM New Conversation Webhook",
+            "type": "hook"
+          },
+          "maxResults": 1
+        },
+        "mapper": {},
+        "metadata": {
+          "designer": { "x": 0, "y": 1000 },
+          "comment": "Webhook para iniciar conversaciones nuevas desde el CRM - soporta contactos nuevos y existentes",
+          "parameters": [
+            {
+              "name": "hook",
+              "type": "hook:gateway-webhook",
+              "label": "Webhook",
+              "required": true
+            }
+          ],
+          "expect": [
+            { "name": "to", "type": "text", "label": "Recipient Phone" },
+            { "name": "message", "type": "text", "label": "First Message Text" },
+            { "name": "contactName", "type": "text", "label": "Contact Name" },
+            { "name": "contactId", "type": "text", "label": "Contact ID (if existing)" },
+            { "name": "conversationId", "type": "text", "label": "Conversation ID" },
+            { "name": "teamId", "type": "text", "label": "Team ID" },
+            { "name": "isNewContact", "type": "boolean", "label": "Is New Contact" }
+          ]
+        },
+        "routes": [
+          {
+            "flow": [
+              {
+                "id": 17,
+                "module": "http:ActionSendData",
+                "version": 3,
+                "parameters": {},
+                "mapper": {
+                  "url": "https://api.ycloud.com/v2/whatsapp/messages",
+                  "serializeUrl": false,
+                  "method": "POST",
+                  "headers": [
+                    { "name": "X-API-Key", "value": "__YCLOUD_API_KEY__" },
+                    { "name": "Content-Type", "value": "application/json" }
+                  ],
+                  "qs": [],
+                  "bodyType": "raw",
+                  "parseResponse": true,
+                  "contentType": "application/json",
+                  "body": "{\"from\":\"__PHONE_NUMBER__\",\"to\":\"{{16.to}}\",\"type\":\"text\",\"text\":{\"body\":\"{{16.message}}\"}}"
+                },
+                "metadata": {
+                  "designer": { "x": 300, "y": 1000 },
+                  "comment": "Envia el primer mensaje via yCloud WhatsApp API"
+                }
+              },
+              {
+                "id": 18,
+                "module": "builtin:BasicRouter",
+                "version": 1,
+                "mapper": {},
+                "metadata": {
+                  "designer": { "x": 600, "y": 1000 }
+                },
+                "routes": [
+                  {
+                    "label": "Message sent successfully",
+                    "filter": {
+                      "name": "yCloud responded OK",
+                      "conditions": [
+                        [
+                          {
+                            "a": "{{17.statusCode}}",
+                            "b": "200",
+                            "o": "number:equal"
+                          }
+                        ]
+                      ]
+                    },
+                    "flow": [
+                      {
+                        "id": 19,
+                        "module": "google-firebase-firestore:updateDocument",
+                        "version": 3,
+                        "parameters": {},
+                        "mapper": {
+                          "documentId": "teams/{{16.teamId}}/conversations/{{16.conversationId}}",
+                          "data": "{\"updatedAt\":\"{{now}}\"}"
+                        },
+                        "metadata": {
+                          "designer": { "x": 900, "y": 900 },
+                          "comment": "Actualiza timestamp de la conversacion despues de enviar exitosamente"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "label": "Message failed",
+                    "filter": {
+                      "name": "yCloud error",
+                      "conditions": [
+                        [
+                          {
+                            "a": "{{17.statusCode}}",
+                            "b": "200",
+                            "o": "number:notEqual"
+                          }
+                        ]
+                      ]
+                    },
+                    "flow": [
+                      {
+                        "id": 20,
+                        "module": "google-firebase-firestore:addDocument",
+                        "version": 3,
+                        "parameters": {},
+                        "mapper": {
+                          "collectionId": "teams/{{16.teamId}}/messages",
+                          "data": "{\"conversationId\":\"{{16.conversationId}}\",\"contactId\":\"{{16.contactId}}\",\"teamId\":\"{{16.teamId}}\",\"direction\":\"outbound\",\"platform\":\"whatsapp\",\"content\":\"Error: No se pudo enviar el mensaje. Verifica el numero de telefono.\",\"messageType\":\"text\",\"status\":\"failed\",\"isAiGenerated\":false,\"createdAt\":\"{{now}}\",\"metadata\":{\"errorCode\":\"{{17.statusCode}}\",\"errorBody\":\"{{17.body}}\"}}"
+                        },
+                        "metadata": {
+                          "designer": { "x": 900, "y": 1100 },
+                          "comment": "Registra mensaje de error en Firebase cuando falla el envio via yCloud"
+                        }
+                      }
+                    ]
+                  }
+                ]
               }
             ]
           }
@@ -381,5 +532,5 @@
       }
     ]
   },
-  "readme": "## MessageHub - yCloud WhatsApp Integration\n\n### Para importar en Make.com:\n1. Ve a Scenarios > Import Blueprint\n2. Sube este archivo JSON\n3. Reemplaza los placeholders:\n   - __TEAM_ID__ -> Tu Team ID de Firebase\n   - __YCLOUD_API_KEY__ -> Tu API Key de yCloud\n   - __PHONE_NUMBER__ -> Tu numero de WhatsApp en yCloud\n4. Configura las conexiones de Firebase y OpenAI\n5. Activa el escenario"
+  "readme": "## MessageHub - yCloud WhatsApp Integration\n\n### Para importar en Make.com:\n1. Ve a Scenarios > Import Blueprint\n2. Sube este archivo JSON\n3. Reemplaza los placeholders:\n   - __TEAM_ID__ -> Tu Team ID de Firebase\n   - __YCLOUD_API_KEY__ -> Tu API Key de yCloud\n   - __PHONE_NUMBER__ -> Tu numero de WhatsApp en yCloud\n4. Configura las conexiones de Firebase y OpenAI\n5. Activa el escenario\n\n### Escenarios incluidos:\n\n#### 1. Inbound (yCloud -> Firebase)\n- Recibe webhooks de yCloud con mensajes entrantes de WhatsApp\n- Busca/crea contacto en Firebase\n- Crea conversacion y almacena el mensaje\n- Si hay agente IA activo, genera respuesta y la envia via yCloud\n\n#### 2. Outbound (CRM -> yCloud)\n- Recibe webhook del CRM cuando un agente envia un mensaje\n- Envia el mensaje al contacto via yCloud WhatsApp API\n- Actualiza el status del mensaje en Firebase\n\n#### 3. Nueva Conversacion (CRM -> yCloud)\n- Recibe webhook cuando se inicia una nueva conversacion desde el CRM\n- Soporta contactos nuevos y existentes\n- Envia el primer mensaje via yCloud\n- Maneja errores de envio y los registra en Firebase\n\n### Configuracion de yCloud:\n1. En yCloud Dashboard, configura un webhook apuntando al Webhook #1 de Make\n2. Selecciona eventos: whatsapp.inbound_message.received\n3. Copia tu API Key para usarla en __YCLOUD_API_KEY__\n4. Registra tu numero de WhatsApp Business en yCloud"
 }
