@@ -10,7 +10,7 @@ type Step = 'welcome' | 'role' | 'form' | 'google-role' | 'google-form' | 'succe
 const roleOptions: { value: UserRole; label: string; desc: string; icon: React.ReactNode; color: string }[] = [
   { value: 'manager', label: 'Gerente', desc: 'Crea y administra tu equipo', icon: <Users size={24} />, color: 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-700' },
   { value: 'sales_agent', label: 'Agente de Ventas', desc: 'Atiende conversaciones y ventas', icon: <ShoppingCart size={24} />, color: 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-700' },
-  { value: 'warehouse', label: 'Paqueteria', desc: 'Gestiona almacen y envios', icon: <Package size={24} />, color: 'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-700' },
+  { value: 'warehouse', label: 'Paquetería', desc: 'Gestiona almacén y envíos', icon: <Package size={24} />, color: 'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-700' },
 ];
 
 export default function LoginPage() {
@@ -113,7 +113,7 @@ export default function LoginPage() {
 
         {step === 'welcome' && (
           <div className="card p-8 page-enter">
-            <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-6">Iniciar sesion</h2>
+            <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-6">Iniciar sesión</h2>
             {error && <div className="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 text-red-700 dark:text-red-400 text-sm">{error}</div>}
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
@@ -121,17 +121,17 @@ export default function LoginPage() {
                 <input type="email" className="input-field" placeholder="tu@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
               </div>
               <div>
-                <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Contrasena</label>
+                <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Contraseña</label>
                 <input type="password" className="input-field" placeholder="********" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
               </div>
               <button type="submit" disabled={loading} className="btn-primary w-full py-2.5 flex items-center justify-center gap-2">
                 {loading && <Loader2 size={16} className="animate-spin" />}
-                {loading ? 'Ingresando...' : 'Iniciar sesion'}
+                {loading ? 'Ingresando...' : 'Iniciar sesión'}
               </button>
             </form>
             <div className="relative my-6">
               <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-surface-200 dark:border-surface-700" /></div>
-              <div className="relative flex justify-center text-sm"><span className="px-3 bg-white dark:bg-surface-800 text-surface-400">o continua con</span></div>
+              <div className="relative flex justify-center text-sm"><span className="px-3 bg-white dark:bg-surface-800 text-surface-400">o continúa con</span></div>
             </div>
             <button type="button" onClick={handleGoogleSignIn} disabled={loading}
               className="w-full flex items-center justify-center gap-3 py-2.5 px-4 border border-surface-200 dark:border-surface-700 rounded-lg hover:bg-surface-50 dark:hover:bg-surface-700 transition-colors text-sm font-medium text-surface-700 dark:text-surface-300 disabled:opacity-50">
@@ -145,7 +145,7 @@ export default function LoginPage() {
             </button>
             <div className="mt-6 text-center">
               <button onClick={goToSignUp} className="text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400 font-medium transition-colors">
-                No tienes cuenta? Registrate
+                ¿No tienes cuenta? Regístrate
               </button>
             </div>
           </div>
@@ -162,8 +162,8 @@ export default function LoginPage() {
                 <p className="text-xs text-surface-500">{pendingGoogleUser.email}</p>
               </div>
             </div>
-            <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-2">Bienvenido!</h2>
-            <p className="text-sm text-surface-500 mb-6">Es tu primera vez. Selecciona tu rol para continuar:</p>
+            <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-2">¡Bienvenido!</h2>
+            <p className="text-sm text-surface-500 mb-6">Es tu primera vez. Selecciona tu rol para continuar.</p>
             {error && <div className="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 text-red-700 dark:text-red-400 text-sm">{error}</div>}
             <div className="space-y-3">
               {roleOptions.map((r) => (
@@ -191,13 +191,13 @@ export default function LoginPage() {
             {error && <div className="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 text-red-700 dark:text-red-400 text-sm">{error}</div>}
             <form onSubmit={handleGoogleComplete} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Codigo de organizacion</label>
+                <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Código de organización</label>
                 <input type="text" className="input-field uppercase tracking-wider text-center font-mono text-lg" placeholder="ABC123" value={orgCode} onChange={(e) => setOrgCode(e.target.value.toUpperCase())} required maxLength={6} />
-                <p className="text-xs text-surface-400 mt-1">Pide el codigo a tu gerente para unirte a su equipo</p>
+                <p className="text-xs text-surface-400 mt-1">Pide el código a tu gerente para unirte a su equipo</p>
               </div>
               <button type="submit" disabled={loading} className="btn-primary w-full py-2.5 flex items-center justify-center gap-2">
                 {loading && <Loader2 size={16} className="animate-spin" />}
-                {loading ? 'Uniendote al equipo...' : 'Unirme al equipo'}
+                {loading ? 'Uniéndote al equipo...' : 'Unirme al equipo'}
               </button>
             </form>
           </div>
@@ -206,8 +206,8 @@ export default function LoginPage() {
         {step === 'role' && (
           <div className="card p-8 page-enter">
             <button onClick={goToLogin} className="flex items-center gap-1 text-sm text-surface-500 hover:text-surface-700 dark:hover:text-surface-300 mb-4 transition-colors"><ArrowLeft size={16} /> Volver</button>
-            <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-2">Cual es tu rol?</h2>
-            <p className="text-sm text-surface-500 mb-6">Selecciona como vas a usar MessageHub</p>
+            <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-2">¿Cuál es tu rol?</h2>
+            <p className="text-sm text-surface-500 mb-6">Selecciona cómo vas a usar MessageHub</p>
             <div className="space-y-3">
               {roleOptions.map((r) => (
                 <button key={r.value} onClick={() => { setSelectedRole(r.value); setStep('form'); }}
@@ -238,19 +238,19 @@ export default function LoginPage() {
                 <input type="email" className="input-field" placeholder="tu@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
               </div>
               <div>
-                <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Contrasena</label>
-                <input type="password" className="input-field" placeholder="Minimo 6 caracteres" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
+                <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Contraseña</label>
+                <input type="password" className="input-field" placeholder="Mínimo 6 caracteres" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
               </div>
               {selectedRole !== 'manager' && (
                 <div>
-                  <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Codigo de organizacion</label>
+                  <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Código de organización</label>
                   <input type="text" className="input-field uppercase tracking-wider text-center font-mono text-lg" placeholder="ABC123" value={orgCode} onChange={(e) => setOrgCode(e.target.value.toUpperCase())} required maxLength={6} />
-                  <p className="text-xs text-surface-400 mt-1">Pide el codigo a tu gerente para unirte a su equipo</p>
+                  <p className="text-xs text-surface-400 mt-1">Pide el código a tu gerente para unirte a su equipo</p>
                 </div>
               )}
               {selectedRole === 'manager' && (
                 <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
-                  <p className="text-xs text-blue-700 dark:text-blue-400">Se creara una organizacion nueva. Podras invitar empleados compartiendo tu codigo de organizacion.</p>
+                  <p className="text-xs text-blue-700 dark:text-blue-400">Se creará una organización nueva. Podrás invitar empleados compartiendo tu código de organización.</p>
                 </div>
               )}
               <button type="submit" disabled={loading} className="btn-primary w-full py-2.5 flex items-center justify-center gap-2">
@@ -259,7 +259,7 @@ export default function LoginPage() {
               </button>
             </form>
             <div className="mt-4 text-center">
-              <button onClick={goToLogin} className="text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400 font-medium transition-colors">Ya tienes cuenta? Inicia sesion</button>
+              <button onClick={goToLogin} className="text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400 font-medium transition-colors">¿Ya tienes cuenta? Inicia sesión</button>
             </div>
           </div>
         )}

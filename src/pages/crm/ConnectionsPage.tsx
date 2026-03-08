@@ -113,7 +113,7 @@ export default function ConnectionsPage() {
 
               {conn?.isActive && !agent && (
                 <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-100">
-                  <p className="text-xs text-amber-700">Canal conectado sin agente asignado. Los mensajes se recibirán pero no se responderán automáticamente.</p>
+                  <p className="text-xs text-amber-700">Canal conectado sin agente asignado. Los mensajes se recibirán pero no se responderán de forma automática.</p>
                 </div>
               )}
 
@@ -199,14 +199,14 @@ export default function ConnectionsPage() {
               <h2 className="text-lg font-semibold text-surface-800">
                 Asignar agente a {channels.find(c => c.platform === editingChannel)?.label}
               </h2>
-              <p className="text-sm text-surface-500 mt-1">Selecciona qué agente atenderá este canal</p>
+              <p className="text-sm text-surface-500 mt-1">Selecciona qué agente atenderá este canal.</p>
             </div>
             <div className="p-5 space-y-3">
               <div
                 onClick={() => setSelectedAgentId('')}
                 className={classNames('p-3 rounded-lg border-2 cursor-pointer transition-colors', !selectedAgentId ? 'border-primary-300 bg-primary-50' : 'border-surface-200 hover:border-surface-300')}>
                 <p className="text-sm font-medium text-surface-800">Sin agente</p>
-                <p className="text-xs text-surface-400">Solo recibir mensajes, sin respuesta automática</p>
+                <p className="text-xs text-surface-400">Solo recibir mensajes, sin respuesta automática.</p>
               </div>
               {agents.map(agent => (
                 <div key={agent.id}

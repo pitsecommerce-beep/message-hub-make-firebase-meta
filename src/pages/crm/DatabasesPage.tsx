@@ -14,8 +14,8 @@ interface ImportResult {
   message: string;
 }
 
-const CONTACT_TEMPLATE_HEADERS = ['nombre', 'telefono', 'email', 'empresa', 'rfc', 'direccion', 'plataforma', 'notas'];
-const PRODUCT_TEMPLATE_HEADERS = ['sku', 'nombre', 'descripcion', 'precio_unitario', 'categoria', 'stock'];
+const CONTACT_TEMPLATE_HEADERS = ['nombre', 'teléfono', 'email', 'empresa', 'rfc', 'dirección', 'plataforma', 'notas'];
+const PRODUCT_TEMPLATE_HEADERS = ['sku', 'nombre', 'descripción', 'precio_unitario', 'categoría', 'stock'];
 
 export default function DatabasesPage() {
   const { user } = useAuth();
@@ -31,7 +31,7 @@ export default function DatabasesPage() {
 
   const tabs = [
     { id: 'contacts' as ImportType, label: 'Contactos', icon: <Users size={16} />, desc: 'Importa tu lista de clientes y prospectos' },
-    { id: 'products' as ImportType, label: 'Productos / Servicios', icon: <Package size={16} />, desc: 'Importa tu catalogo de productos' },
+    { id: 'products' as ImportType, label: 'Productos / Servicios', icon: <Package size={16} />, desc: 'Importa tu catálogo de productos' },
     { id: 'custom' as ImportType, label: 'Datos personalizados', icon: <Database size={16} />, desc: 'Carga cualquier Excel a Firebase' },
   ];
 
@@ -39,7 +39,7 @@ export default function DatabasesPage() {
     const headers = activeTab === 'contacts' ? CONTACT_TEMPLATE_HEADERS : PRODUCT_TEMPLATE_HEADERS;
     const sampleRow = activeTab === 'contacts'
       ? ['Juan Perez', '+525512345678', 'juan@empresa.com', 'Mi Empresa SA', 'XAXX010101000', 'Av. Reforma 123, CDMX', 'whatsapp', 'Cliente VIP']
-      : ['SKU-001', 'Producto Ejemplo', 'Descripcion del producto', '150.00', 'General', '100'];
+      : ['SKU-001', 'Producto Ejemplo', 'Descripción del producto', '150.00', 'General', '100'];
 
     const csv = [headers.join(','), sampleRow.join(',')].join('\n');
     const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -66,7 +66,7 @@ export default function DatabasesPage() {
       const jsonData = XLSX.utils.sheet_to_json<Record<string, string>>(sheet, { defval: '' });
 
       if (jsonData.length === 0) {
-        setResult({ success: false, count: 0, message: 'El archivo esta vacio' });
+        setResult({ success: false, count: 0, message: 'El archivo está vacío' });
         return;
       }
 
@@ -75,7 +75,7 @@ export default function DatabasesPage() {
       setAllData(jsonData);
       setPreviewData(jsonData.slice(0, 5));
     } catch {
-      setResult({ success: false, count: 0, message: 'Error al leer el archivo. Asegurate de que sea un Excel (.xlsx, .xls) o CSV valido.' });
+      setResult({ success: false, count: 0, message: 'Error al leer el archivo. Asegúrate de que sea un Excel (.xlsx, .xls) o CSV válido.' });
     }
 
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -98,13 +98,13 @@ export default function DatabasesPage() {
           return {
             teamId: user.teamId,
             name,
-            phone: row['telefono'] || row['phone'] || row['Telefono'] || row['Phone'] || undefined,
+            phone: row['teléfono'] || row['telefono'] || row['phone'] || row['Teléfono'] || row['Telefono'] || row['Phone'] || undefined,
             email: row['email'] || row['Email'] || row['correo'] || undefined,
             company: row['empresa'] || row['company'] || row['Empresa'] || undefined,
             rfc: row['rfc'] || row['RFC'] || undefined,
-            address: row['direccion'] || row['address'] || row['Direccion'] || undefined,
+            address: row['dirección'] || row['direccion'] || row['address'] || row['Dirección'] || row['Direccion'] || undefined,
             platform: (row['plataforma'] || row['platform'] || 'whatsapp') as Contact['platform'],
-            platformId: row['telefono'] || row['phone'] || row['email'] || `import-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            platformId: row['teléfono'] || row['telefono'] || row['phone'] || row['email'] || `import-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             tags: [],
             notes: row['notas'] || row['notes'] || '',
             createdAt: now,
@@ -119,9 +119,9 @@ export default function DatabasesPage() {
           teamId: user.teamId,
           sku: row['sku'] || row['SKU'] || row['codigo'] || `SKU-${Date.now().toString(36).slice(-4).toUpperCase()}`,
           name: row['nombre'] || row['name'] || row['Nombre'] || row['producto'] || Object.values(row)[0] || '',
-          description: row['descripcion'] || row['description'] || row['Descripcion'] || undefined,
+          description: row['descripción'] || row['descripcion'] || row['description'] || row['Descripción'] || row['Descripcion'] || undefined,
           unitPrice: parseFloat(row['precio_unitario'] || row['precio'] || row['price'] || row['Precio'] || '0') || 0,
-          category: row['categoria'] || row['category'] || row['Categoria'] || undefined,
+          category: row['categoría'] || row['categoria'] || row['category'] || row['Categoría'] || row['Categoria'] || undefined,
           stock: parseInt(row['stock'] || row['Stock'] || row['inventario'] || '0') || undefined,
           createdAt: now,
           updatedAt: now,
@@ -129,7 +129,7 @@ export default function DatabasesPage() {
         count = await bulkImportProducts(user.teamId, products);
       } else {
         if (!customCollection.trim()) {
-          setResult({ success: false, count: 0, message: 'Ingresa un nombre para la coleccion' });
+          setResult({ success: false, count: 0, message: 'Ingresa un nombre para la colección' });
           setImporting(false);
           return;
         }
@@ -197,8 +197,8 @@ export default function DatabasesPage() {
           <div className="mb-4 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
             <p className="text-xs text-blue-700 dark:text-blue-400">
               {activeTab === 'contacts'
-                ? 'Columnas esperadas: nombre, telefono, email, empresa, rfc, direccion, plataforma, notas. Puedes usar tu propio archivo, intentaremos mapear las columnas automaticamente.'
-                : 'Columnas esperadas: sku, nombre, descripcion, precio_unitario, categoria, stock. Puedes usar tu propio archivo con columnas similares.'
+                ? 'Columnas esperadas: nombre, teléfono, email, empresa, rfc, dirección, plataforma, notas. Puedes usar tu propio archivo, intentaremos mapear las columnas automáticamente.'
+                : 'Columnas esperadas: sku, nombre, descripción, precio_unitario, categoría, stock. Puedes usar tu propio archivo con columnas similares.'
               }
             </p>
           </div>
@@ -206,7 +206,7 @@ export default function DatabasesPage() {
 
         {activeTab === 'custom' && (
           <div className="mb-4">
-            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Nombre de la coleccion en Firebase</label>
+            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Nombre de la colección en Firebase</label>
             <input
               type="text"
               className="input-field max-w-md"
@@ -214,14 +214,14 @@ export default function DatabasesPage() {
               value={customCollection}
               onChange={e => setCustomCollection(e.target.value)}
             />
-            <p className="text-xs text-surface-400 mt-1">Los datos se guardaran en teams/TU_TEAM/{customCollection || '...'}</p>
+            <p className="text-xs text-surface-400 mt-1">Los datos se guardarán en teams/TU_TEAM/{customCollection || '...'}</p>
           </div>
         )}
 
         {!fileName && (
           <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-surface-300 dark:border-surface-600 rounded-xl cursor-pointer hover:border-primary-400 hover:bg-primary-50/50 dark:hover:bg-primary-900/10 transition-colors">
             <Upload size={32} className="text-surface-400 mb-2" />
-            <p className="text-sm font-medium text-surface-600 dark:text-surface-400">Arrastra tu archivo aqui o haz clic para seleccionar</p>
+            <p className="text-sm font-medium text-surface-600 dark:text-surface-400">Arrastra tu archivo aquí o haz clic para seleccionar</p>
             <p className="text-xs text-surface-400 mt-1">Acepta .xlsx, .xls, .csv</p>
             <input
               ref={fileInputRef}
@@ -284,7 +284,7 @@ export default function DatabasesPage() {
             {result.success ? <Check size={18} className="text-emerald-600 dark:text-emerald-400 mt-0.5" /> : <AlertCircle size={18} className="text-red-600 dark:text-red-400 mt-0.5" />}
             <div>
               <p className={classNames('text-sm font-medium', result.success ? 'text-emerald-800 dark:text-emerald-300' : 'text-red-800 dark:text-red-300')}>{result.message}</p>
-              {result.success && <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">Los datos estan disponibles en tu cuenta. Puedes verlos en la seccion correspondiente.</p>}
+              {result.success && <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">Los datos están disponibles en tu cuenta. Puedes verlos en la sección correspondiente.</p>}
             </div>
           </div>
         )}

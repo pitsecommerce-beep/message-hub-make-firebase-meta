@@ -74,7 +74,7 @@ export default function OrdersPage() {
           )}
         </div>
         <div className="flex-1 overflow-auto px-6 pb-6">
-          {orders.length === 0 ? <EmptyState icon="shopping-cart" title="Sin pedidos" description="Crea tu primer pedido con el boton de arriba." /> : viewMode === 'list' ? (
+          {orders.length === 0 ? <EmptyState icon="shopping-cart" title="Sin pedidos" description="Crea tu primer pedido con el botón de arriba." /> : viewMode === 'list' ? (
             <div className="card overflow-hidden">
               <table className="w-full">
                 <thead><tr className="border-b border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800/50"><th className="text-left text-xs font-medium text-surface-500 px-4 py-3">Pedido</th><th className="text-left text-xs font-medium text-surface-500 px-4 py-3">Cliente</th><th className="text-left text-xs font-medium text-surface-500 px-4 py-3">Estado</th><th className="text-left text-xs font-medium text-surface-500 px-4 py-3">Items</th><th className="text-right text-xs font-medium text-surface-500 px-4 py-3">Total</th><th className="text-left text-xs font-medium text-surface-500 px-4 py-3">Fecha</th><th className="text-right text-xs font-medium text-surface-500 px-4 py-3"></th></tr></thead>
@@ -125,10 +125,10 @@ export default function OrdersPage() {
             <div className="mb-5 p-3 rounded-lg bg-surface-50 dark:bg-surface-700 space-y-1.5 text-sm">
               <div className="flex justify-between text-surface-600 dark:text-surface-400"><span>Subtotal</span><span>{formatCurrency(selectedOrder.subtotal)}</span></div>
               <div className="flex justify-between text-surface-600 dark:text-surface-400"><span>IVA</span><span>{formatCurrency(selectedOrder.tax)}</span></div>
-              <div className="flex justify-between text-surface-600 dark:text-surface-400"><span>Envio</span><span>{selectedOrder.shipping === 0 ? 'Gratis' : formatCurrency(selectedOrder.shipping)}</span></div>
+              <div className="flex justify-between text-surface-600 dark:text-surface-400"><span>Envío</span><span>{selectedOrder.shipping === 0 ? 'Gratis' : formatCurrency(selectedOrder.shipping)}</span></div>
               <div className="flex justify-between font-semibold text-surface-900 dark:text-surface-100 pt-1.5 border-t border-surface-200 dark:border-surface-600"><span>Total</span><span>{formatCurrency(selectedOrder.total)}</span></div>
             </div>
-            {selectedOrder.shippingAddress && <div className="mb-5"><h4 className="text-xs font-medium text-surface-400 mb-1 flex items-center gap-1"><MapPin size={12} /> Direccion</h4><p className="text-sm text-surface-700 dark:text-surface-300">{selectedOrder.shippingAddress}</p></div>}
+            {selectedOrder.shippingAddress && <div className="mb-5"><h4 className="text-xs font-medium text-surface-400 mb-1 flex items-center gap-1"><MapPin size={12} /> Dirección</h4><p className="text-sm text-surface-700 dark:text-surface-300">{selectedOrder.shippingAddress}</p></div>}
             {selectedOrder.trackingNumber && <div className="mb-5"><h4 className="text-xs font-medium text-surface-400 mb-1 flex items-center gap-1"><Truck size={12} /> Rastreo</h4><p className="text-sm text-primary-600 font-medium">{selectedOrder.trackingNumber}</p></div>}
             {selectedOrder.notes && <div className="mb-5 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800"><p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-0.5">Notas</p><p className="text-sm text-amber-800 dark:text-amber-300">{selectedOrder.notes}</p></div>}
           </div>
@@ -340,8 +340,8 @@ function NewOrderModal({ teamId, onClose, onSaved }: { teamId: string; onClose: 
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Direccion de envio</label>
-            <input type="text" className="input-field" placeholder="Calle, Numero, Colonia, Ciudad, CP" value={shippingAddress} onChange={e => setShippingAddress(e.target.value)} />
+            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Dirección de envío</label>
+            <input type="text" className="input-field" placeholder="Calle, Número, Colonia, Ciudad, CP" value={shippingAddress} onChange={e => setShippingAddress(e.target.value)} />
           </div>
 
           <div>
