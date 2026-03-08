@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { Bot, Plus, Power, PowerOff, Edit3, Trash2, Clock, MessageSquare, Save, X, Send, Loader2, ChevronRight, Settings2, Sparkles } from 'lucide-react';
+import { Bot, Plus, Power, PowerOff, Edit3, Trash2, MessageSquare, Save, X, Send, Loader2, ChevronRight, Settings2, Sparkles, Database, Clock } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { getAIAgents, createAIAgent, updateAIAgent, deleteAIAgent, getTeam } from '@/services/firestore';
+import { getAIAgents, createAIAgent, updateAIAgent, deleteAIAgent, getTeam, getKnowledgeBases } from '@/services/firestore';
 import { classNames } from '@/utils/helpers';
 import PageHeader from '@/components/shared/PageHeader';
-import type { AIAgent, AIAgentScope, Team } from '@/types';
+import type { AIAgent, Team, KnowledgeBase } from '@/types';
 
 type TestMessage = { role: 'user' | 'assistant'; content: string };
 
@@ -12,6 +12,7 @@ export default function AIAgentsPage() {
   const { user } = useAuth();
   const [agents, setAgents] = useState<AIAgent[]>([]);
   const [team, setTeam] = useState<Team | null>(null);
+  const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
   const [editingAgent, setEditingAgent] = useState<AIAgent | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -19,17 +20,19 @@ export default function AIAgentsPage() {
   const [testMessages, setTestMessages] = useState<TestMessage[]>([]);
   const [testInput, setTestInput] = useState('');
   const [testLoading, setTestLoading] = useState(false);
-  const [activeSection, setActiveSection] = useState<'basic' | 'behavior' | 'advanced'>('basic');
+  const [activeSection, setActiveSection] = useState<'basic' | 'knowledge' | 'advanced'>('basic');
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const loadData = async () => {
     if (!user?.teamId) return;
-    const [a, t] = await Promise.all([
+    const [a, t, kb] = await Promise.all([
       getAIAgents(user.teamId).catch(() => []),
       getTeam(user.teamId).catch(() => null),
+      getKnowledgeBases(user.teamId).catch(() => []),
     ]);
     setAgents(a);
     setTeam(t);
+    setKnowledgeBases(kb);
     setLoading(false);
   };
 
@@ -47,8 +50,9 @@ export default function AIAgentsPage() {
 
   const handleNew = () => {
     setEditingAgent({
-      id: '', teamId: user?.teamId || '', name: '', providerId: 'openai', systemPrompt: '',
-      isActive: false, scope: 'all', selectedConversationIds: [], useBusinessHours: true,
+      id: '', teamId: user?.teamId || '', name: '', providerId: '', systemPrompt: '',
+      isActive: false, scope: 'all', selectedConversationIds: [], knowledgeBaseIds: [],
+      attendOutsideBusinessHours: false,
       maxTokens: 500, temperature: 0.7, createdAt: '', updatedAt: '',
     });
     setIsNew(true);
@@ -145,12 +149,6 @@ export default function AIAgentsPage() {
     setTestLoading(false);
   };
 
-  const scopes: { value: AIAgentScope; label: string; desc: string }[] = [
-    { value: 'all', label: 'Todas las conversaciones', desc: 'Responde automáticamente en todas' },
-    { value: 'selected', label: 'Solo conversaciones seleccionadas', desc: 'Elige en cuáles responde' },
-    { value: 'none', label: 'Desactivado', desc: 'No responde automáticamente' },
-  ];
-
   const getCreativityLabel = (temp: number) => {
     if (temp <= 0.15) return 'Muy preciso';
     if (temp <= 0.4) return 'Preciso';
@@ -165,6 +163,22 @@ export default function AIAgentsPage() {
     { value: 'anthropic', label: 'Anthropic Claude' },
     { value: 'custom', label: 'Proveedor personalizado' },
   ];
+
+  const toggleKnowledgeBase = (kbId: string) => {
+    if (!editingAgent) return;
+    const ids = editingAgent.knowledgeBaseIds || [];
+    if (ids.includes(kbId)) {
+      setEditingAgent({ ...editingAgent, knowledgeBaseIds: ids.filter(id => id !== kbId) });
+    } else {
+      setEditingAgent({ ...editingAgent, knowledgeBaseIds: [...ids, kbId] });
+    }
+  };
+
+  const getAgentKBNames = (agent: AIAgent) => {
+    const ids = agent.knowledgeBaseIds || [];
+    if (ids.length === 0) return 'Sin bases de datos';
+    return ids.map(id => knowledgeBases.find(kb => kb.id === id)?.name || '').filter(Boolean).join(', ') || 'Sin bases de datos';
+  };
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>;
 
@@ -203,20 +217,23 @@ export default function AIAgentsPage() {
                   <div className={classNames('w-10 h-10 rounded-lg flex items-center justify-center', agent.isActive ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400' : 'bg-surface-100 dark:bg-surface-700 text-surface-400')}><Bot size={20} /></div>
                   <div>
                     <h3 className="text-sm font-semibold text-surface-800 dark:text-surface-200">{agent.name}</h3>
-                    <p className="text-xs text-surface-400">{getCreativityLabel(agent.temperature)} - {agent.scope === 'all' ? 'Todas las conversaciones' : agent.scope === 'selected' ? 'Conversaciones seleccionadas' : 'Desactivado'}</p>
+                    <p className="text-xs text-surface-400">{getCreativityLabel(agent.temperature)}</p>
                   </div>
                 </div>
                 <button onClick={() => toggleActive(agent)} className={classNames('p-2 rounded-lg transition-colors', agent.isActive ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400' : 'bg-surface-100 dark:bg-surface-700 text-surface-400')}>
                   {agent.isActive ? <Power size={16} /> : <PowerOff size={16} />}
                 </button>
               </div>
-              <p className="text-xs text-surface-500 dark:text-surface-400 mb-3 line-clamp-2">{agent.systemPrompt || 'Sin instrucciones configuradas'}</p>
+              <p className="text-xs text-surface-500 dark:text-surface-400 mb-2 line-clamp-2">{agent.systemPrompt || 'Sin instrucciones configuradas'}</p>
+              <div className="flex items-center gap-3 text-xs text-surface-400 mb-2">
+                <span className="flex items-center gap-1"><Database size={12} /> {getAgentKBNames(agent)}</span>
+              </div>
               <div className="flex items-center gap-3 text-xs text-surface-400 mb-4">
-                <span className="flex items-center gap-1"><Clock size={12} />{agent.useBusinessHours ? 'Horario comercial' : 'Siempre activo'}</span>
+                <span className="flex items-center gap-1"><Clock size={12} />{agent.attendOutsideBusinessHours ? 'Atiende fuera de horario' : 'Solo horario comercial'}</span>
                 <span className={classNames('px-2 py-0.5 rounded-full', agent.isActive ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400' : 'bg-surface-100 dark:bg-surface-700')}>{agent.isActive ? 'Activo' : 'Inactivo'}</span>
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => { setEditingAgent({ ...agent }); setIsNew(false); setActiveSection('basic'); }} className="btn-secondary text-xs py-1.5 flex items-center gap-1"><Edit3 size={12} /> Editar</button>
+                <button onClick={() => { setEditingAgent({ ...agent, knowledgeBaseIds: agent.knowledgeBaseIds || [] }); setIsNew(false); setActiveSection('basic'); }} className="btn-secondary text-xs py-1.5 flex items-center gap-1"><Edit3 size={12} /> Editar</button>
                 <button onClick={() => startTest(agent)} className="btn-secondary text-xs py-1.5 flex items-center gap-1"><MessageSquare size={12} /> Probar</button>
                 <button onClick={() => handleDelete(agent.id)} className="btn-ghost text-xs py-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-1"><Trash2 size={12} /> Eliminar</button>
               </div>
@@ -238,7 +255,7 @@ export default function AIAgentsPage() {
             <div className="flex border-b border-surface-200 dark:border-surface-700 px-5">
               {[
                 { id: 'basic' as const, label: 'Información básica' },
-                { id: 'behavior' as const, label: 'Comportamiento' },
+                { id: 'knowledge' as const, label: 'Bases de datos' },
                 { id: 'advanced' as const, label: 'Opciones avanzadas' },
               ].map(tab => (
                 <button
@@ -276,38 +293,63 @@ export default function AIAgentsPage() {
                     <p className="text-xs text-surface-400 mb-2">Describe cómo quieres que se comporte tu agente. ¿Qué personalidad tiene? ¿Qué información debe dar? ¿Qué no debe hacer?</p>
                     <textarea className="input-field min-h-[150px] resize-y" placeholder="Ej: Eres un asistente amable de ventas para [tu empresa]. Ayudas a los clientes con información de productos, precios y disponibilidad. Siempre saludas cordialmente y ofreces ayuda adicional..." value={editingAgent.systemPrompt} onChange={e => setEditingAgent({ ...editingAgent, systemPrompt: e.target.value })} />
                   </div>
+
+                  {/* Attend outside business hours */}
+                  <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg border border-surface-200 dark:border-surface-700 hover:border-surface-300 transition-colors">
+                    <input type="checkbox" className="w-4 h-4 rounded border-surface-300 dark:border-surface-600 text-primary-500" checked={editingAgent.attendOutsideBusinessHours} onChange={e => setEditingAgent({ ...editingAgent, attendOutsideBusinessHours: e.target.checked })} />
+                    <div>
+                      <span className="text-sm font-medium text-surface-700 dark:text-surface-300">Atender fuera de horario laboral</span>
+                      <p className="text-xs text-surface-400">Si está activo, el agente responderá incluso fuera de tu horario comercial configurado en Configuración {'>'} Horario</p>
+                    </div>
+                  </label>
                 </>
               )}
 
-              {activeSection === 'behavior' && (
+              {activeSection === 'knowledge' && (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">¿En qué conversaciones responde?</label>
-                    <div className="space-y-2">
-                      {scopes.map(s => (
-                        <button key={s.value} type="button" onClick={() => setEditingAgent({ ...editingAgent, scope: s.value })}
-                          className={classNames('w-full flex items-center gap-3 p-3 rounded-lg border text-left transition-all duration-200',
-                            editingAgent.scope === s.value ? 'border-primary-300 dark:border-primary-600 bg-primary-50 dark:bg-primary-900/20' : 'border-surface-200 dark:border-surface-700 hover:border-surface-300')}>
-                          <div className={classNames('w-4 h-4 rounded-full border-2 flex items-center justify-center',
-                            editingAgent.scope === s.value ? 'border-primary-500' : 'border-surface-300 dark:border-surface-600')}>
-                            {editingAgent.scope === s.value && <div className="w-2 h-2 rounded-full bg-primary-500" />}
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-surface-800 dark:text-surface-200">{s.label}</p>
-                            <p className="text-xs text-surface-400">{s.desc}</p>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                    <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">Bases de datos disponibles para consultar</label>
+                    <p className="text-xs text-surface-400 mb-4">Selecciona las bases de datos que este agente puede usar para responder preguntas. Sube bases en la sección Bases de Datos.</p>
 
-                  <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg border border-surface-200 dark:border-surface-700 hover:border-surface-300 transition-colors">
-                    <input type="checkbox" className="w-4 h-4 rounded border-surface-300 dark:border-surface-600 text-primary-500" checked={editingAgent.useBusinessHours} onChange={e => setEditingAgent({ ...editingAgent, useBusinessHours: e.target.checked })} />
-                    <div>
-                      <span className="text-sm font-medium text-surface-700 dark:text-surface-300">Solo responder en horario comercial</span>
-                      <p className="text-xs text-surface-400">Configura tu horario en Configuración {'>'} Horario</p>
-                    </div>
-                  </label>
+                    {knowledgeBases.length === 0 ? (
+                      <div className="text-center py-8 border-2 border-dashed border-surface-200 dark:border-surface-700 rounded-xl">
+                        <Database size={32} className="mx-auto mb-2 text-surface-300 dark:text-surface-600" />
+                        <p className="text-sm text-surface-500 mb-1">No hay bases de datos cargadas</p>
+                        <p className="text-xs text-surface-400">Ve a Bases de Datos para cargar tu primera base.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {knowledgeBases.map(kb => {
+                          const isSelected = (editingAgent.knowledgeBaseIds || []).includes(kb.id);
+                          return (
+                            <button
+                              key={kb.id}
+                              type="button"
+                              onClick={() => toggleKnowledgeBase(kb.id)}
+                              className={classNames(
+                                'w-full flex items-center gap-3 p-3 rounded-lg border text-left transition-all duration-200',
+                                isSelected
+                                  ? 'border-primary-300 dark:border-primary-600 bg-primary-50 dark:bg-primary-900/20'
+                                  : 'border-surface-200 dark:border-surface-700 hover:border-surface-300'
+                              )}
+                            >
+                              <div className={classNames(
+                                'w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0',
+                                isSelected ? 'border-primary-500 bg-primary-500' : 'border-surface-300 dark:border-surface-600'
+                              )}>
+                                {isSelected && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-surface-800 dark:text-surface-200">{kb.name}</p>
+                                <p className="text-xs text-surface-400">{kb.recordCount} registros - {kb.fileName}</p>
+                              </div>
+                              <Database size={16} className={isSelected ? 'text-primary-500' : 'text-surface-400'} />
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </>
               )}
 
@@ -339,13 +381,13 @@ export default function AIAgentsPage() {
             <div className="flex items-center justify-between p-5 border-t border-surface-200 dark:border-surface-700">
               <div className="flex gap-1">
                 {activeSection !== 'basic' && (
-                  <button type="button" onClick={() => setActiveSection(activeSection === 'advanced' ? 'behavior' : 'basic')} className="btn-ghost text-sm">Anterior</button>
+                  <button type="button" onClick={() => setActiveSection(activeSection === 'advanced' ? 'knowledge' : 'basic')} className="btn-ghost text-sm">Anterior</button>
                 )}
               </div>
               <div className="flex items-center gap-2">
                 <button onClick={() => setEditingAgent(null)} className="btn-secondary">Cancelar</button>
                 {activeSection !== 'advanced' ? (
-                  <button type="button" onClick={() => setActiveSection(activeSection === 'basic' ? 'behavior' : 'advanced')} className="btn-primary flex items-center gap-1">Siguiente <ChevronRight size={14} /></button>
+                  <button type="button" onClick={() => setActiveSection(activeSection === 'basic' ? 'knowledge' : 'advanced')} className="btn-primary flex items-center gap-1">Siguiente <ChevronRight size={14} /></button>
                 ) : (
                   <button onClick={handleSave} className="btn-primary flex items-center gap-2"><Save size={16} /> Guardar agente</button>
                 )}

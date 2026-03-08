@@ -235,6 +235,24 @@ export default function ConversationsPage() {
               </div>
             </div>
             <div className="flex items-center gap-1">
+              <button
+                onClick={async () => {
+                  if (!user?.teamId || !selectedConvo) return;
+                  const newVal = !selectedConvo.aiEnabled;
+                  await updateConversation(user.teamId, selectedConvo.id, { aiEnabled: newVal });
+                  setSelectedConvo({ ...selectedConvo, aiEnabled: newVal });
+                }}
+                className={classNames(
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
+                  selectedConvo.aiEnabled
+                    ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400 hover:bg-violet-200 dark:hover:bg-violet-900/50'
+                    : 'bg-surface-100 dark:bg-surface-700 text-surface-500 hover:bg-surface-200 dark:hover:bg-surface-600'
+                )}
+                title={selectedConvo.aiEnabled ? 'Desactivar agente IA' : 'Activar agente IA'}
+              >
+                <Bot size={14} />
+                {selectedConvo.aiEnabled ? 'IA Activa' : 'IA Inactiva'}
+              </button>
               <button onClick={() => setShowContactPanel(!showContactPanel)} className={classNames('p-2 rounded-lg transition-colors', showContactPanel ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400' : 'hover:bg-surface-100 dark:hover:bg-surface-700 text-surface-400')}>
                 <User size={18} />
               </button>
