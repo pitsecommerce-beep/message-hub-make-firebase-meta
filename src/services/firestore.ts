@@ -113,6 +113,15 @@ export async function getConversations(teamId: string): Promise<Conversation[]> 
   }
 }
 
+export async function createConversation(teamId: string, data: Omit<Conversation, 'id'>): Promise<string> {
+  try {
+    const ref = await addDoc(teamCollection(teamId, 'conversations'), data);
+    return ref.id;
+  } catch (error) {
+    handleFirestoreError(error, 'crear la conversación');
+  }
+}
+
 export async function updateConversation(teamId: string, id: string, data: Partial<Conversation>) {
   try {
     await updateDoc(doc(db, 'teams', teamId, 'conversations', id), data);
