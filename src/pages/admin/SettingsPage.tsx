@@ -8,6 +8,26 @@ import type { AIProviderConfig, Team } from '@/types';
 
 type SettingsTab = 'general' | 'meta' | 'ai-providers' | 'hours' | 'webhooks';
 
+const MODEL_OPTIONS: Record<string, { value: string; label: string }[]> = {
+  openai: [
+    { value: 'gpt-4o', label: 'GPT-4o' },
+    { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
+    { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
+    { value: 'gpt-4', label: 'GPT-4' },
+    { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' },
+    { value: 'o3-mini', label: 'O3 Mini' },
+    { value: 'o1', label: 'O1' },
+    { value: 'o1-mini', label: 'O1 Mini' },
+  ],
+  anthropic: [
+    { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4' },
+    { value: 'claude-opus-4-20250514', label: 'Claude Opus 4' },
+    { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5' },
+    { value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet' },
+    { value: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku' },
+  ],
+};
+
 const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
   { id: 'general', label: 'General', icon: <Palette size={16} /> },
   { id: 'meta', label: 'Meta API', icon: <MessageSquare size={16} /> },
@@ -198,7 +218,7 @@ export default function SettingsPage() {
                 <div className="space-y-4">{providers.map(provider => (
                   <div key={provider.id} className="p-4 rounded-xl border border-surface-200 space-y-3">
                     <div className="flex items-center justify-between"><input type="text" className="input-field max-w-xs" placeholder="Nombre" value={provider.name} onChange={e => updateProvider(provider.id, 'name', e.target.value)} /><button onClick={() => removeProvider(provider.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-surface-400 hover:text-red-500"><Trash2 size={14} /></button></div>
-                    <div className="grid grid-cols-2 gap-3"><div><label className="block text-xs text-surface-500 mb-1">Proveedor</label><select className="input-field" value={provider.provider} onChange={e => updateProvider(provider.id, 'provider', e.target.value)}><option value="openai">OpenAI</option><option value="anthropic">Anthropic</option><option value="custom">Personalizado</option></select></div><div><label className="block text-xs text-surface-500 mb-1">Modelo</label><input type="text" className="input-field" placeholder="gpt-4o" value={provider.model} onChange={e => updateProvider(provider.id, 'model', e.target.value)} /></div></div>
+                    <div className="grid grid-cols-2 gap-3"><div><label className="block text-xs text-surface-500 mb-1">Proveedor</label><select className="input-field" value={provider.provider} onChange={e => { updateProvider(provider.id, 'provider', e.target.value); updateProvider(provider.id, 'model', ''); }}><option value="openai">OpenAI</option><option value="anthropic">Anthropic</option><option value="custom">Personalizado</option></select></div><div><label className="block text-xs text-surface-500 mb-1">Modelo</label>{provider.provider === 'custom' ? (<input type="text" className="input-field" placeholder="nombre-del-modelo" value={provider.model} onChange={e => updateProvider(provider.id, 'model', e.target.value)} />) : (<select className="input-field" value={provider.model} onChange={e => updateProvider(provider.id, 'model', e.target.value)}><option value="">Seleccionar modelo...</option>{(MODEL_OPTIONS[provider.provider] || []).map(m => (<option key={m.value} value={m.value}>{m.label}</option>))}</select>)}</div></div>
                     <div><label className="block text-xs text-surface-500 mb-1">API Key</label><input type="password" className="input-field" placeholder="sk-..." value={provider.apiKey} onChange={e => updateProvider(provider.id, 'apiKey', e.target.value)} /></div>
                     {provider.provider === 'custom' && <div><label className="block text-xs text-surface-500 mb-1">Base URL</label><input type="url" className="input-field" placeholder="https://api.custom.com/v1" value={provider.baseUrl} onChange={e => updateProvider(provider.id, 'baseUrl', e.target.value)} /></div>}
                   </div>
