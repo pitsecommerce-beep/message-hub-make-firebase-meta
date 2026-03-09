@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { Bot, Plus, Power, PowerOff, Edit3, Trash2, MessageSquare, Save, X, Send, Loader2, ChevronRight, Sparkles, Database, Clock } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { getAIAgents, createAIAgent, updateAIAgent, deleteAIAgent, getTeam, getKnowledgeBases } from '@/services/firestore';
+import { getAIAgents, createAIAgent, updateAIAgent, deleteAIAgent, getKnowledgeBases } from '@/services/firestore';
 import { classNames } from '@/utils/helpers';
 import PageHeader from '@/components/shared/PageHeader';
-import type { AIAgent, AIProviderType, Team, KnowledgeBase } from '@/types';
+import type { AIAgent, AIProviderType, KnowledgeBase } from '@/types';
 
 type TestMessage = { role: 'user' | 'assistant'; content: string };
 
@@ -37,7 +37,6 @@ const PROVIDER_LABELS: Record<string, string> = {
 export default function AIAgentsPage() {
   const { user } = useAuth();
   const [agents, setAgents] = useState<AIAgent[]>([]);
-  const [team, setTeam] = useState<Team | null>(null);
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
   const [editingAgent, setEditingAgent] = useState<AIAgent | null>(null);
   const [isNew, setIsNew] = useState(false);
@@ -51,13 +50,11 @@ export default function AIAgentsPage() {
 
   const loadData = async () => {
     if (!user?.teamId) return;
-    const [a, t, kb] = await Promise.all([
+    const [a, kb] = await Promise.all([
       getAIAgents(user.teamId).catch(() => []),
-      getTeam(user.teamId).catch(() => null),
       getKnowledgeBases(user.teamId).catch(() => []),
     ]);
     setAgents(a);
-    setTeam(t);
     setKnowledgeBases(kb);
     setLoading(false);
   };
