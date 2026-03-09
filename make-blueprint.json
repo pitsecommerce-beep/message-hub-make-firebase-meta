@@ -136,7 +136,15 @@
                           "data": "{\"name\":\"{{1.contact.profile.name}}\",\"phone\":\"{{1.contact.wa_id}}\",\"platform\":\"whatsapp\",\"platformId\":\"{{1.contact.wa_id}}\",\"tags\":[],\"notes\":\"\",\"teamId\":\"__TEAM_ID__\",\"createdAt\":\"{{now}}\",\"updatedAt\":\"{{now}}\",\"lastMessageAt\":\"{{now}}\"}"
                         },
                         "metadata": {
-                          "designer": { "x": 900, "y": 150 }
+                          "designer": { "x": 900, "y": 150 },
+                          "parameters": [
+                            {
+                              "name": "connection",
+                              "type": "account:google-firebase",
+                              "label": "Firebase Connection",
+                              "required": true
+                            }
+                          ]
                         }
                       }
                     ]
@@ -166,7 +174,15 @@
                           "data": "{\"lastMessageAt\":\"{{now}}\",\"updatedAt\":\"{{now}}\"}"
                         },
                         "metadata": {
-                          "designer": { "x": 900, "y": -150 }
+                          "designer": { "x": 900, "y": -150 },
+                          "parameters": [
+                            {
+                              "name": "connection",
+                              "type": "account:google-firebase",
+                              "label": "Firebase Connection",
+                              "required": true
+                            }
+                          ]
                         }
                       }
                     ]
@@ -183,7 +199,15 @@
                   "data": "{\"contactId\":\"{{ifempty(2.`__name__`; 4.`__name__`)}}\",\"teamId\":\"__TEAM_ID__\",\"platform\":\"whatsapp\",\"status\":\"open\",\"aiEnabled\":false,\"unreadCount\":1,\"createdAt\":\"{{now}}\",\"updatedAt\":\"{{now}}\"}"
                 },
                 "metadata": {
-                  "designer": { "x": 1200, "y": 0 }
+                  "designer": { "x": 1200, "y": 0 },
+                  "parameters": [
+                    {
+                      "name": "connection",
+                      "type": "account:google-firebase",
+                      "label": "Firebase Connection",
+                      "required": true
+                    }
+                  ]
                 }
               },
               {
@@ -196,7 +220,15 @@
                   "data": "{\"conversationId\":\"{{5.`__name__`}}\",\"contactId\":\"{{ifempty(2.`__name__`; 4.`__name__`)}}\",\"teamId\":\"__TEAM_ID__\",\"direction\":\"inbound\",\"platform\":\"whatsapp\",\"content\":\"{{1.whatsappInboundMessage.text.body}}\",\"messageType\":\"text\",\"status\":\"delivered\",\"isAiGenerated\":false,\"createdAt\":\"{{now}}\"}"
                 },
                 "metadata": {
-                  "designer": { "x": 1500, "y": 0 }
+                  "designer": { "x": 1500, "y": 0 },
+                  "parameters": [
+                    {
+                      "name": "connection",
+                      "type": "account:google-firebase",
+                      "label": "Firebase Connection",
+                      "required": true
+                    }
+                  ]
                 }
               },
               {
@@ -212,14 +244,22 @@
                       {
                         "fieldPath": "isActive",
                         "op": "EQUAL",
-                        "value": true
+                        "value": "true"
                       }
                     ]
                   ],
                   "limit": "1"
                 },
                 "metadata": {
-                  "designer": { "x": 1800, "y": 0 }
+                  "designer": { "x": 1800, "y": 0 },
+                  "parameters": [
+                    {
+                      "name": "connection",
+                      "type": "account:google-firebase",
+                      "label": "Firebase Connection",
+                      "required": true
+                    }
+                  ]
                 }
               },
               {
@@ -305,7 +345,15 @@
                           "data": "{\"conversationId\":\"{{5.`__name__`}}\",\"contactId\":\"{{ifempty(2.`__name__`; 4.`__name__`)}}\",\"teamId\":\"__TEAM_ID__\",\"direction\":\"outbound\",\"platform\":\"whatsapp\",\"content\":\"{{9.choices[1].message.content}}\",\"messageType\":\"text\",\"status\":\"sent\",\"isAiGenerated\":true,\"createdAt\":\"{{now}}\"}"
                         },
                         "metadata": {
-                          "designer": { "x": 3000, "y": -150 }
+                          "designer": { "x": 3000, "y": -150 },
+                          "parameters": [
+                            {
+                              "name": "connection",
+                              "type": "account:google-firebase",
+                              "label": "Firebase Connection",
+                              "required": true
+                            }
+                          ]
                         }
                       }
                     ]
@@ -346,7 +394,8 @@
             { "name": "message", "type": "text", "label": "Message Text" },
             { "name": "conversationId", "type": "text", "label": "Conversation ID" },
             { "name": "contactId", "type": "text", "label": "Contact ID" },
-            { "name": "teamId", "type": "text", "label": "Team ID" }
+            { "name": "teamId", "type": "text", "label": "Team ID" },
+            { "name": "messageId", "type": "text", "label": "Message ID" }
           ]
         },
         "routes": [
@@ -381,12 +430,20 @@
                 "version": 3,
                 "parameters": {},
                 "mapper": {
-                  "documentId": "teams/{{12.teamId}}/messages/{{15.`__name__`}}",
+                  "documentId": "teams/{{12.teamId}}/messages/{{12.messageId}}",
                   "data": "{\"status\":\"delivered\"}"
                 },
                 "metadata": {
                   "designer": { "x": 600, "y": 500 },
-                  "comment": "Actualiza el status del mensaje a delivered despues de enviar por yCloud"
+                  "comment": "Actualiza el status del mensaje a delivered despues de enviar por yCloud",
+                  "parameters": [
+                    {
+                      "name": "connection",
+                      "type": "account:google-firebase",
+                      "label": "Firebase Connection",
+                      "required": true
+                    }
+                  ]
                 }
               }
             ]
@@ -488,7 +545,15 @@
                         },
                         "metadata": {
                           "designer": { "x": 900, "y": 900 },
-                          "comment": "Actualiza timestamp de la conversacion despues de enviar exitosamente"
+                          "comment": "Actualiza timestamp de la conversacion despues de enviar exitosamente",
+                          "parameters": [
+                            {
+                              "name": "connection",
+                              "type": "account:google-firebase",
+                              "label": "Firebase Connection",
+                              "required": true
+                            }
+                          ]
                         }
                       }
                     ]
@@ -519,7 +584,15 @@
                         },
                         "metadata": {
                           "designer": { "x": 900, "y": 1100 },
-                          "comment": "Registra mensaje de error en Firebase cuando falla el envio via yCloud"
+                          "comment": "Registra mensaje de error en Firebase cuando falla el envio via yCloud",
+                          "parameters": [
+                            {
+                              "name": "connection",
+                              "type": "account:google-firebase",
+                              "label": "Firebase Connection",
+                              "required": true
+                            }
+                          ]
                         }
                       }
                     ]
