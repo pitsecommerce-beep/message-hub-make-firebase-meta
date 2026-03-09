@@ -159,7 +159,7 @@ export default function ConnectionsPage() {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-surface-800">{agent.name}</p>
-                      <p className="text-xs text-surface-400">{agent.providerId} - {agent.isActive ? 'Activo' : 'Inactivo'}</p>
+                      <p className="text-xs text-surface-400">{agent.provider || 'openai'} - {agent.isActive ? 'Activo' : 'Inactivo'}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -215,7 +215,7 @@ export default function ConnectionsPage() {
                   <div className={classNames('w-9 h-9 rounded-lg flex items-center justify-center', agent.isActive ? 'bg-violet-100 text-violet-600' : 'bg-surface-200 text-surface-400')}>
                     <Bot size={18} />
                   </div>
-                  <div><p className="text-sm font-medium text-surface-800">{agent.name}</p><p className="text-xs text-surface-400">{agent.providerId}</p></div>
+                  <div><p className="text-sm font-medium text-surface-800">{agent.name}</p><p className="text-xs text-surface-400">{agent.provider || 'openai'} - {agent.model || 'sin modelo'}</p></div>
                 </div>
               ))}
             </div>

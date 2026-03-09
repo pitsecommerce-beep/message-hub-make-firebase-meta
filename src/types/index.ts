@@ -202,6 +202,10 @@ export interface AIAgent {
   teamId: string;
   name: string;
   providerId: string;
+  provider: AIProviderType;
+  model: string;
+  apiKey: string;
+  baseUrl?: string;
   systemPrompt: string;
   isActive: boolean;
   scope: AIAgentScope;
