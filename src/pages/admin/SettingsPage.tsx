@@ -1,37 +1,16 @@
 import { useState, useEffect } from 'react';
-import { Clock, Palette, Save, Webhook, MessageSquare, Bot, Plus, Trash2, Copy, Check, Image, Type } from 'lucide-react';
+import { Clock, Palette, Save, Webhook, MessageSquare, Copy, Check, Image, Type } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getTeam, updateTeam } from '@/services/firestore';
 import { classNames } from '@/utils/helpers';
 import PageHeader from '@/components/shared/PageHeader';
-import type { AIProviderConfig, Team } from '@/types';
+import type { Team } from '@/types';
 
-type SettingsTab = 'general' | 'meta' | 'ai-providers' | 'hours' | 'webhooks';
-
-const MODEL_OPTIONS: Record<string, { value: string; label: string }[]> = {
-  openai: [
-    { value: 'gpt-4o', label: 'GPT-4o' },
-    { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
-    { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
-    { value: 'gpt-4', label: 'GPT-4' },
-    { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' },
-    { value: 'o3-mini', label: 'O3 Mini' },
-    { value: 'o1', label: 'O1' },
-    { value: 'o1-mini', label: 'O1 Mini' },
-  ],
-  anthropic: [
-    { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4' },
-    { value: 'claude-opus-4-20250514', label: 'Claude Opus 4' },
-    { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5' },
-    { value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet' },
-    { value: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku' },
-  ],
-};
+type SettingsTab = 'general' | 'meta' | 'hours' | 'webhooks';
 
 const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
   { id: 'general', label: 'General', icon: <Palette size={16} /> },
   { id: 'meta', label: 'Meta API', icon: <MessageSquare size={16} /> },
-  { id: 'ai-providers', label: 'Proveedores IA', icon: <Bot size={16} /> },
   { id: 'hours', label: 'Horario', icon: <Clock size={16} /> },
   { id: 'webhooks', label: 'Webhooks / Make', icon: <Webhook size={16} /> },
 ];
@@ -54,7 +33,6 @@ export default function SettingsPage() {
   const [makeWebhookInbound, setMakeWebhookInbound] = useState('');
   const [makeWebhookOutbound, setMakeWebhookOutbound] = useState('');
   const [makeScenarioUrl, setMakeScenarioUrl] = useState('');
-  const [providers, setProviders] = useState<AIProviderConfig[]>([]);
   const [timezone, setTimezone] = useState('America/Mexico_City');
   const days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
   const [schedule, setSchedule] = useState(days.map((d, i) => ({ day: d, enabled: i < 6, start: '09:00', end: '18:00' })));
@@ -71,7 +49,6 @@ export default function SettingsPage() {
         setPrimaryColor(t.settings?.primaryColor || '#1a85e6');
         setBrandName(t.settings?.brandName || 'Message Hub');
         setFaviconUrl(t.settings?.faviconUrl || '');
-        setProviders(t.settings?.aiProviders || []);
         setTimezone(t.settings?.businessHours?.timezone || 'America/Mexico_City');
         const mc = t.settings?.metaConfig || {};
         setWhatsappBusinessId(mc.whatsappBusinessId || '');
@@ -112,7 +89,7 @@ export default function SettingsPage() {
         primaryColor,
         brandName: brandName.trim() || 'Message Hub',
         faviconUrl: faviconUrl.trim(),
-        aiProviders: providers,
+        aiProviders: team?.settings?.aiProviders || [],
         businessHours: {
           timezone,
           schedule: Object.fromEntries(dayKeys.map((k, i) => [k, { enabled: schedule[i].enabled, start: schedule[i].start, end: schedule[i].end }])),
@@ -125,10 +102,6 @@ export default function SettingsPage() {
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
-
-  const addProvider = () => setProviders(prev => [...prev, { id: `p-${Date.now()}`, name: '', provider: 'openai', apiKey: '', model: '', baseUrl: '' }]);
-  const removeProvider = (id: string) => setProviders(prev => prev.filter(p => p.id !== id));
-  const updateProvider = (id: string, field: keyof AIProviderConfig, value: string) => setProviders(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p));
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>;
 
@@ -208,22 +181,6 @@ export default function SettingsPage() {
               <div><label className="block text-sm font-medium text-surface-700 mb-1">Phone Number ID</label><input type="text" className="input-field max-w-md" placeholder="109876543210" value={phoneNumberId} onChange={e => setPhoneNumberId(e.target.value)} /></div>
               <div><label className="block text-sm font-medium text-surface-700 mb-1">Access Token (Meta)</label><input type="password" className="input-field max-w-md" placeholder="EAAxxxxxxxx..." value={accessToken} onChange={e => setAccessToken(e.target.value)} /><p className="text-xs text-surface-400 mt-1">Token permanente de tu app de Meta para enviar mensajes.</p></div>
               <div><label className="block text-sm font-medium text-surface-700 mb-1">Webhook Verify Token</label><div className="flex items-center gap-2 max-w-md"><input type="text" className="input-field" value={webhookVerifyToken} onChange={e => setWebhookVerifyToken(e.target.value)} /><button onClick={() => handleCopy(webhookVerifyToken, 'verify')} className="btn-secondary p-2">{copied === 'verify' ? <Check size={16} /> : <Copy size={16} />}</button></div><p className="text-xs text-surface-400 mt-1">Usa este token al configurar el webhook en Meta / Make.</p></div>
-            </div>
-          )}
-
-          {activeTab === 'ai-providers' && (
-            <div className="space-y-4">
-              <div className="card p-6">
-                <div className="flex items-center justify-between mb-4"><h3 className="text-base font-semibold text-surface-800">Proveedores de IA</h3><button onClick={addProvider} className="btn-secondary text-sm flex items-center gap-1"><Plus size={14} /> Agregar</button></div>
-                <div className="space-y-4">{providers.map(provider => (
-                  <div key={provider.id} className="p-4 rounded-xl border border-surface-200 space-y-3">
-                    <div className="flex items-center justify-between"><input type="text" className="input-field max-w-xs" placeholder="Nombre" value={provider.name} onChange={e => updateProvider(provider.id, 'name', e.target.value)} /><button onClick={() => removeProvider(provider.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-surface-400 hover:text-red-500"><Trash2 size={14} /></button></div>
-                    <div className="grid grid-cols-2 gap-3"><div><label className="block text-xs text-surface-500 mb-1">Proveedor</label><select className="input-field" value={provider.provider} onChange={e => { updateProvider(provider.id, 'provider', e.target.value); updateProvider(provider.id, 'model', ''); }}><option value="openai">OpenAI</option><option value="anthropic">Anthropic</option><option value="custom">Personalizado</option></select></div><div><label className="block text-xs text-surface-500 mb-1">Modelo</label>{provider.provider === 'custom' ? (<input type="text" className="input-field" placeholder="nombre-del-modelo" value={provider.model} onChange={e => updateProvider(provider.id, 'model', e.target.value)} />) : (<select className="input-field" value={provider.model} onChange={e => updateProvider(provider.id, 'model', e.target.value)}><option value="">Seleccionar modelo...</option>{(MODEL_OPTIONS[provider.provider] || []).map(m => (<option key={m.value} value={m.value}>{m.label}</option>))}</select>)}</div></div>
-                    <div><label className="block text-xs text-surface-500 mb-1">API Key</label><input type="password" className="input-field" placeholder="sk-..." value={provider.apiKey} onChange={e => updateProvider(provider.id, 'apiKey', e.target.value)} /></div>
-                    {provider.provider === 'custom' && <div><label className="block text-xs text-surface-500 mb-1">Base URL</label><input type="url" className="input-field" placeholder="https://api.custom.com/v1" value={provider.baseUrl} onChange={e => updateProvider(provider.id, 'baseUrl', e.target.value)} /></div>}
-                  </div>
-                ))}</div>
-              </div>
             </div>
           )}
 

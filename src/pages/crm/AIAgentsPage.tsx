@@ -1,12 +1,38 @@
 import { useState, useEffect, useRef } from 'react';
-import { Bot, Plus, Power, PowerOff, Edit3, Trash2, MessageSquare, Save, X, Send, Loader2, ChevronRight, Settings2, Sparkles, Database, Clock } from 'lucide-react';
+import { Bot, Plus, Power, PowerOff, Edit3, Trash2, MessageSquare, Save, X, Send, Loader2, ChevronRight, Sparkles, Database, Clock } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getAIAgents, createAIAgent, updateAIAgent, deleteAIAgent, getTeam, getKnowledgeBases } from '@/services/firestore';
 import { classNames } from '@/utils/helpers';
 import PageHeader from '@/components/shared/PageHeader';
-import type { AIAgent, Team, KnowledgeBase } from '@/types';
+import type { AIAgent, AIProviderType, Team, KnowledgeBase } from '@/types';
 
 type TestMessage = { role: 'user' | 'assistant'; content: string };
+
+const MODEL_OPTIONS: Record<string, { value: string; label: string }[]> = {
+  openai: [
+    { value: 'gpt-4o', label: 'GPT-4o' },
+    { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
+    { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
+    { value: 'gpt-4', label: 'GPT-4' },
+    { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' },
+    { value: 'o3-mini', label: 'O3 Mini' },
+    { value: 'o1', label: 'O1' },
+    { value: 'o1-mini', label: 'O1 Mini' },
+  ],
+  anthropic: [
+    { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4' },
+    { value: 'claude-opus-4-20250514', label: 'Claude Opus 4' },
+    { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5' },
+    { value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet' },
+    { value: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku' },
+  ],
+};
+
+const PROVIDER_LABELS: Record<string, string> = {
+  openai: 'OpenAI',
+  anthropic: 'Anthropic',
+  custom: 'Personalizado',
+};
 
 export default function AIAgentsPage() {
   const { user } = useAuth();
@@ -50,7 +76,9 @@ export default function AIAgentsPage() {
 
   const handleNew = () => {
     setEditingAgent({
-      id: '', teamId: user?.teamId || '', name: '', providerId: '', systemPrompt: '',
+      id: '', teamId: user?.teamId || '', name: '', providerId: '',
+      provider: 'openai', model: '', apiKey: '', baseUrl: '',
+      systemPrompt: '',
       isActive: false, scope: 'all', selectedConversationIds: [], knowledgeBaseIds: [],
       attendOutsideBusinessHours: false,
       maxTokens: 500, temperature: 0.7, createdAt: '', updatedAt: '',
@@ -84,16 +112,14 @@ export default function AIAgentsPage() {
   };
 
   const sendTestMessage = async () => {
-    if (!testInput.trim() || !testingAgent || !team) return;
+    if (!testInput.trim() || !testingAgent) return;
     const userMsg = testInput.trim();
     setTestInput('');
     setTestMessages(prev => [...prev, { role: 'user', content: userMsg }]);
     setTestLoading(true);
 
-    const provider = team.settings?.aiProviders?.find(p => p.provider === testingAgent.providerId || p.id === testingAgent.providerId);
-
-    if (!provider?.apiKey) {
-      setTestMessages(prev => [...prev, { role: 'assistant', content: 'No se encontró un proveedor de IA configurado con API Key. Ve a Configuración > Proveedores IA para agregar uno.' }]);
+    if (!testingAgent.apiKey) {
+      setTestMessages(prev => [...prev, { role: 'assistant', content: 'Este agente no tiene una API Key configurada. Edita el agente para agregar tu API Key.' }]);
       setTestLoading(false);
       return;
     }
@@ -103,11 +129,11 @@ export default function AIAgentsPage() {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       let body: Record<string, unknown> = {};
 
-      if (provider.provider === 'openai' || provider.provider === 'custom') {
-        apiUrl = provider.baseUrl ? `${provider.baseUrl}/chat/completions` : 'https://api.openai.com/v1/chat/completions';
-        headers['Authorization'] = `Bearer ${provider.apiKey}`;
+      if (testingAgent.provider === 'openai' || testingAgent.provider === 'custom') {
+        apiUrl = testingAgent.baseUrl ? `${testingAgent.baseUrl}/chat/completions` : 'https://api.openai.com/v1/chat/completions';
+        headers['Authorization'] = `Bearer ${testingAgent.apiKey}`;
         body = {
-          model: provider.model || 'gpt-4o-mini',
+          model: testingAgent.model || 'gpt-4o-mini',
           messages: [
             { role: 'system', content: testingAgent.systemPrompt || 'Eres un asistente útil.' },
             ...testMessages.map(m => ({ role: m.role, content: m.content })),
@@ -116,13 +142,13 @@ export default function AIAgentsPage() {
           max_tokens: testingAgent.maxTokens,
           temperature: testingAgent.temperature,
         };
-      } else if (provider.provider === 'anthropic') {
+      } else if (testingAgent.provider === 'anthropic') {
         apiUrl = 'https://api.anthropic.com/v1/messages';
-        headers['x-api-key'] = provider.apiKey;
+        headers['x-api-key'] = testingAgent.apiKey;
         headers['anthropic-version'] = '2023-06-01';
         headers['anthropic-dangerous-direct-browser-access'] = 'true';
         body = {
-          model: provider.model || 'claude-sonnet-4-20250514',
+          model: testingAgent.model || 'claude-sonnet-4-20250514',
           system: testingAgent.systemPrompt || 'Eres un asistente útil.',
           messages: [
             ...testMessages.map(m => ({ role: m.role, content: m.content })),
@@ -136,7 +162,7 @@ export default function AIAgentsPage() {
       const data = await resp.json();
 
       let reply = '';
-      if (provider.provider === 'anthropic') {
+      if (testingAgent.provider === 'anthropic') {
         reply = data.content?.[0]?.text || data.error?.message || 'Sin respuesta';
       } else {
         reply = data.choices?.[0]?.message?.content || data.error?.message || 'Sin respuesta';
@@ -157,12 +183,14 @@ export default function AIAgentsPage() {
     return 'Muy creativo';
   };
 
-  const providerOptions = [
-    ...(team?.settings?.aiProviders || []).map(p => ({ value: p.id, label: `${p.name || p.provider} (${p.model || p.provider})` })),
-    { value: 'openai', label: 'OpenAI (por defecto)' },
-    { value: 'anthropic', label: 'Anthropic Claude' },
-    { value: 'custom', label: 'Proveedor personalizado' },
-  ];
+  const getModelLabel = (agent: AIAgent) => {
+    const models = MODEL_OPTIONS[agent.provider];
+    if (models) {
+      const found = models.find(m => m.value === agent.model);
+      if (found) return found.label;
+    }
+    return agent.model || agent.provider;
+  };
 
   const toggleKnowledgeBase = (kbId: string) => {
     if (!editingAgent) return;
@@ -187,18 +215,6 @@ export default function AIAgentsPage() {
       <PageHeader title="Agente de IA" subtitle="Configura tu asistente inteligente para responder conversaciones"
         actions={<button onClick={handleNew} className="btn-primary text-sm flex items-center gap-2"><Plus size={16} /> Nuevo agente</button>} />
 
-      {(!team?.settings?.aiProviders || team.settings.aiProviders.length === 0) && (
-        <div className="mb-6 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-          <div className="flex items-start gap-3">
-            <Settings2 size={18} className="text-amber-600 dark:text-amber-400 mt-0.5" />
-            <div>
-              <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Configura un proveedor de IA primero</p>
-              <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">Ve a Configuración {'>'} Proveedores IA para agregar tu API Key de OpenAI, Anthropic u otro proveedor.</p>
-            </div>
-          </div>
-        </div>
-      )}
-
       {agents.length === 0 ? (
         <div className="card p-12 text-center">
           <div className="w-16 h-16 rounded-2xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center mx-auto mb-4">
@@ -217,7 +233,7 @@ export default function AIAgentsPage() {
                   <div className={classNames('w-10 h-10 rounded-lg flex items-center justify-center', agent.isActive ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400' : 'bg-surface-100 dark:bg-surface-700 text-surface-400')}><Bot size={20} /></div>
                   <div>
                     <h3 className="text-sm font-semibold text-surface-800 dark:text-surface-200">{agent.name}</h3>
-                    <p className="text-xs text-surface-400">{getCreativityLabel(agent.temperature)}</p>
+                    <p className="text-xs text-surface-400">{PROVIDER_LABELS[agent.provider] || agent.provider} - {getModelLabel(agent)}</p>
                   </div>
                 </div>
                 <button onClick={() => toggleActive(agent)} className={classNames('p-2 rounded-lg transition-colors', agent.isActive ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400' : 'bg-surface-100 dark:bg-surface-700 text-surface-400')}>
@@ -233,7 +249,7 @@ export default function AIAgentsPage() {
                 <span className={classNames('px-2 py-0.5 rounded-full', agent.isActive ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400' : 'bg-surface-100 dark:bg-surface-700')}>{agent.isActive ? 'Activo' : 'Inactivo'}</span>
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => { setEditingAgent({ ...agent, knowledgeBaseIds: agent.knowledgeBaseIds || [] }); setIsNew(false); setActiveSection('basic'); }} className="btn-secondary text-xs py-1.5 flex items-center gap-1"><Edit3 size={12} /> Editar</button>
+                <button onClick={() => { setEditingAgent({ ...agent, knowledgeBaseIds: agent.knowledgeBaseIds || [], provider: agent.provider || 'openai', model: agent.model || '', apiKey: agent.apiKey || '', baseUrl: agent.baseUrl || '' }); setIsNew(false); setActiveSection('basic'); }} className="btn-secondary text-xs py-1.5 flex items-center gap-1"><Edit3 size={12} /> Editar</button>
                 <button onClick={() => startTest(agent)} className="btn-secondary text-xs py-1.5 flex items-center gap-1"><MessageSquare size={12} /> Probar</button>
                 <button onClick={() => handleDelete(agent.id)} className="btn-ghost text-xs py-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-1"><Trash2 size={12} /> Eliminar</button>
               </div>
@@ -280,14 +296,73 @@ export default function AIAgentsPage() {
                     <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Nombre de tu agente</label>
                     <input type="text" className="input-field" placeholder="Ej: Asistente de Ventas, Soporte 24/7..." value={editingAgent.name} onChange={e => setEditingAgent({ ...editingAgent, name: e.target.value })} />
                   </div>
+
+                  {/* Provider selection */}
                   <div>
                     <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Proveedor de IA</label>
-                    <select className="input-field" value={editingAgent.providerId} onChange={e => setEditingAgent({ ...editingAgent, providerId: e.target.value })}>
-                      <option value="">Seleccionar proveedor...</option>
-                      {providerOptions.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                    <select
+                      className="input-field"
+                      value={editingAgent.provider}
+                      onChange={e => setEditingAgent({ ...editingAgent, provider: e.target.value as AIProviderType, model: '' })}
+                    >
+                      <option value="openai">OpenAI</option>
+                      <option value="anthropic">Anthropic</option>
+                      <option value="custom">Personalizado</option>
                     </select>
-                    <p className="text-xs text-surface-400 mt-1">Agrega proveedores en Configuración {'>'} Proveedores IA</p>
                   </div>
+
+                  {/* Model selection */}
+                  <div>
+                    <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Modelo</label>
+                    {editingAgent.provider === 'custom' ? (
+                      <input
+                        type="text"
+                        className="input-field"
+                        placeholder="nombre-del-modelo"
+                        value={editingAgent.model}
+                        onChange={e => setEditingAgent({ ...editingAgent, model: e.target.value })}
+                      />
+                    ) : (
+                      <select
+                        className="input-field"
+                        value={editingAgent.model}
+                        onChange={e => setEditingAgent({ ...editingAgent, model: e.target.value })}
+                      >
+                        <option value="">Seleccionar modelo...</option>
+                        {(MODEL_OPTIONS[editingAgent.provider] || []).map(m => (
+                          <option key={m.value} value={m.value}>{m.label}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+
+                  {/* API Key */}
+                  <div>
+                    <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">API Key</label>
+                    <input
+                      type="password"
+                      className="input-field"
+                      placeholder="sk-..."
+                      value={editingAgent.apiKey}
+                      onChange={e => setEditingAgent({ ...editingAgent, apiKey: e.target.value })}
+                    />
+                    <p className="text-xs text-surface-400 mt-1">Tu clave de API del proveedor seleccionado</p>
+                  </div>
+
+                  {/* Base URL for custom provider */}
+                  {editingAgent.provider === 'custom' && (
+                    <div>
+                      <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Base URL</label>
+                      <input
+                        type="url"
+                        className="input-field"
+                        placeholder="https://api.custom.com/v1"
+                        value={editingAgent.baseUrl || ''}
+                        onChange={e => setEditingAgent({ ...editingAgent, baseUrl: e.target.value })}
+                      />
+                    </div>
+                  )}
+
                   <div>
                     <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Instrucciones del agente</label>
                     <p className="text-xs text-surface-400 mb-2">Describe cómo quieres que se comporte tu agente. ¿Qué personalidad tiene? ¿Qué información debe dar? ¿Qué no debe hacer?</p>
@@ -417,7 +492,7 @@ export default function AIAgentsPage() {
                 <div className="text-center py-12">
                   <Bot size={40} className="mx-auto mb-3 text-surface-300 dark:text-surface-600" />
                   <p className="text-sm text-surface-500">Escribe un mensaje para probar tu agente</p>
-                  <p className="text-xs text-surface-400 mt-1">La conversación usará tu API Key configurada</p>
+                  <p className="text-xs text-surface-400 mt-1">La conversación usará la API Key del agente</p>
                 </div>
               )}
               {testMessages.map((msg, i) => (
