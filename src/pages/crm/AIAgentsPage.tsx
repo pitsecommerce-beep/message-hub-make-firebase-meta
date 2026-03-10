@@ -96,8 +96,8 @@ export default function AIAgentsPage() {
       }
       setEditingAgent(null);
       loadData();
-    } catch {
-      alert('Error al guardar el agente. Verifica los datos e intenta de nuevo.');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al guardar el agente. Verifica los datos e intenta de nuevo.');
     }
   };
 

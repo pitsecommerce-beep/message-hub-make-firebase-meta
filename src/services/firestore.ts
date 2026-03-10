@@ -4,6 +4,7 @@ import {
   getDocs,
   getDoc,
   addDoc,
+  setDoc,
   updateDoc,
   deleteDoc,
   query,
@@ -68,7 +69,7 @@ export function subscribeContacts(
 ): Unsubscribe {
   const q = query(teamCollection(teamId, 'contacts'), orderBy('lastMessageAt', 'desc'));
   return onSnapshot(q, (snap) => {
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() }) as Contact));
+    callback(snap.docs.map(d => ({ ...d.data(), id: d.id }) as Contact));
   }, (error) => {
     console.error('Error al escuchar contactos:', error);
     callback([]);
@@ -79,7 +80,7 @@ export async function getContacts(teamId: string): Promise<Contact[]> {
   try {
     const q = query(teamCollection(teamId, 'contacts'), orderBy('lastMessageAt', 'desc'));
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as Contact);
+    return snap.docs.map(d => ({ ...d.data(), id: d.id }) as Contact);
   } catch (error) {
     handleFirestoreError(error, 'cargar los contactos');
   }
@@ -87,7 +88,17 @@ export async function getContacts(teamId: string): Promise<Contact[]> {
 
 export async function createContact(teamId: string, data: Omit<Contact, 'id'>): Promise<string> {
   try {
-    const ref = await addDoc(teamCollection(teamId, 'contacts'), data);
+    const cleanData = stripUndefined(data as Record<string, unknown>);
+    const phone = data.phone?.replace(/\D/g, '');
+    if (phone) {
+      const existingDoc = await getDoc(doc(db, 'teams', teamId, 'contacts', phone));
+      if (existingDoc.exists()) {
+        throw { code: 'already-exists' };
+      }
+      await setDoc(doc(db, 'teams', teamId, 'contacts', phone), cleanData);
+      return phone;
+    }
+    const ref = await addDoc(teamCollection(teamId, 'contacts'), cleanData);
     return ref.id;
   } catch (error) {
     handleFirestoreError(error, 'crear el contacto');
@@ -117,7 +128,7 @@ export function subscribeConversations(
 ): Unsubscribe {
   const q = query(teamCollection(teamId, 'conversations'), orderBy('updatedAt', 'desc'));
   return onSnapshot(q, (snap) => {
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() }) as Conversation));
+    callback(snap.docs.map(d => ({ ...d.data(), id: d.id }) as Conversation));
   }, (error) => {
     console.error('Error al escuchar conversaciones:', error);
     callback([]);
@@ -128,7 +139,7 @@ export async function getConversations(teamId: string): Promise<Conversation[]> 
   try {
     const q = query(teamCollection(teamId, 'conversations'), orderBy('updatedAt', 'desc'));
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as Conversation);
+    return snap.docs.map(d => ({ ...d.data(), id: d.id }) as Conversation);
   } catch (error) {
     handleFirestoreError(error, 'cargar las conversaciones');
   }
@@ -178,7 +189,7 @@ export function subscribeMessages(
     orderBy('createdAt', 'asc')
   );
   return onSnapshot(q, (snap) => {
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() }) as Message));
+    callback(snap.docs.map(d => ({ ...d.data(), id: d.id }) as Message));
   }, (error) => {
     console.error('Error al escuchar mensajes:', error);
     callback([]);
@@ -202,7 +213,7 @@ export async function getOrders(teamId: string, constraints?: QueryConstraint[])
       ...(constraints || [orderBy('createdAt', 'desc')])
     );
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as Order);
+    return snap.docs.map(d => ({ ...d.data(), id: d.id }) as Order);
   } catch (error) {
     handleFirestoreError(error, 'cargar los pedidos');
   }
@@ -229,7 +240,7 @@ export async function updateOrder(teamId: string, id: string, data: Partial<Orde
 export async function getAIAgents(teamId: string): Promise<AIAgent[]> {
   try {
     const snap = await getDocs(teamCollection(teamId, 'aiAgents'));
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as AIAgent);
+    return snap.docs.map(d => ({ ...d.data(), id: d.id }) as AIAgent);
   } catch (error) {
     handleFirestoreError(error, 'cargar los agentes de IA');
   }
@@ -237,7 +248,8 @@ export async function getAIAgents(teamId: string): Promise<AIAgent[]> {
 
 export async function createAIAgent(teamId: string, data: Omit<AIAgent, 'id'>): Promise<string> {
   try {
-    const ref = await addDoc(teamCollection(teamId, 'aiAgents'), data);
+    const { id: _stripId, ...cleanData } = data as Record<string, unknown>;
+    const ref = await addDoc(teamCollection(teamId, 'aiAgents'), stripUndefined(cleanData));
     return ref.id;
   } catch (error) {
     handleFirestoreError(error, 'crear el agente de IA');
@@ -265,7 +277,7 @@ export async function getProducts(teamId: string): Promise<Product[]> {
   try {
     const q = query(teamCollection(teamId, 'products'), orderBy('name', 'asc'));
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as Product);
+    return snap.docs.map(d => ({ ...d.data(), id: d.id }) as Product);
   } catch (error) {
     handleFirestoreError(error, 'cargar los productos');
   }
@@ -364,7 +376,7 @@ export function subscribeKnowledgeBases(
 ): Unsubscribe {
   const q = query(teamCollection(teamId, 'knowledgeBases'), orderBy('createdAt', 'desc'));
   return onSnapshot(q, (snap) => {
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() }) as KnowledgeBase));
+    callback(snap.docs.map(d => ({ ...d.data(), id: d.id }) as KnowledgeBase));
   }, (error) => {
     console.error('Error al escuchar bases de datos:', error);
     callback([]);
@@ -375,7 +387,7 @@ export async function getKnowledgeBases(teamId: string): Promise<KnowledgeBase[]
   try {
     const q = query(teamCollection(teamId, 'knowledgeBases'), orderBy('createdAt', 'desc'));
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as KnowledgeBase);
+    return snap.docs.map(d => ({ ...d.data(), id: d.id }) as KnowledgeBase);
   } catch (error) {
     handleFirestoreError(error, 'cargar las bases de datos');
   }
@@ -463,7 +475,7 @@ export async function getTeamInvites(teamId: string): Promise<TeamInvite[]> {
   try {
     const q = query(collection(db, 'invites'), where('teamId', '==', teamId));
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as TeamInvite);
+    return snap.docs.map(d => ({ ...d.data(), id: d.id }) as TeamInvite);
   } catch (error) {
     handleFirestoreError(error, 'cargar las invitaciones del equipo');
   }
