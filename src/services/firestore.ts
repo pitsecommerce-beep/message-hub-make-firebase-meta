@@ -246,7 +246,7 @@ export async function createAIAgent(teamId: string, data: Omit<AIAgent, 'id'>): 
 
 export async function updateAIAgent(teamId: string, id: string, data: Partial<AIAgent>) {
   try {
-    await updateDoc(doc(db, 'teams', teamId, 'aiAgents', id), data);
+    await updateDoc(doc(db, 'teams', teamId, 'aiAgents', id), stripUndefined(data as Record<string, unknown>));
   } catch (error) {
     handleFirestoreError(error, 'actualizar el agente de IA');
   }
