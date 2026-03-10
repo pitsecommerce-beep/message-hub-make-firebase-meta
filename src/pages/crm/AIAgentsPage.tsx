@@ -87,13 +87,18 @@ export default function AIAgentsPage() {
   const handleSave = async () => {
     if (!editingAgent || !user?.teamId) return;
     const now = new Date().toISOString();
-    if (isNew) {
-      await createAIAgent(user.teamId, { ...editingAgent, teamId: user.teamId, createdAt: now, updatedAt: now });
-    } else {
-      await updateAIAgent(user.teamId, editingAgent.id, { ...editingAgent, updatedAt: now });
+    try {
+      if (isNew) {
+        await createAIAgent(user.teamId, { ...editingAgent, teamId: user.teamId, createdAt: now, updatedAt: now });
+      } else {
+        const { id: _id, ...dataWithoutId } = editingAgent;
+        await updateAIAgent(user.teamId, editingAgent.id, { ...dataWithoutId, updatedAt: now });
+      }
+      setEditingAgent(null);
+      loadData();
+    } catch {
+      alert('Error al guardar el agente. Verifica los datos e intenta de nuevo.');
     }
-    setEditingAgent(null);
-    loadData();
   };
 
   const handleDelete = async (id: string) => {
