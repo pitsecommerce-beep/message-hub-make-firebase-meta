@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { Bot, Plus, Power, PowerOff, Edit3, Trash2, MessageSquare, Save, X, Send, Loader2, ChevronRight, Sparkles, Database, Clock } from 'lucide-react';
+import { Bot, Plus, Power, PowerOff, Edit3, Trash2, MessageSquare, Save, X, Send, Loader2, ChevronRight, Sparkles, Database, Clock, MessageCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getAIAgents, createAIAgent, updateAIAgent, deleteAIAgent, getKnowledgeBases } from '@/services/firestore';
 import { classNames } from '@/utils/helpers';
 import PageHeader from '@/components/shared/PageHeader';
-import type { AIAgent, AIProviderType, KnowledgeBase } from '@/types';
+import type { AIAgent, AIProviderType, KnowledgeBase, MessagePlatform } from '@/types';
+import PlatformIcon from '@/components/shared/PlatformIcon';
 
 type TestMessage = { role: 'user' | 'assistant'; content: string };
 
@@ -79,17 +80,46 @@ export default function AIAgentsPage() {
       isActive: false, scope: 'all', selectedConversationIds: [], knowledgeBaseIds: [],
       attendOutsideBusinessHours: false,
       maxTokens: 500, temperature: 0.7, createdAt: '', updatedAt: '',
+      connectedChannels: [],
     });
     setIsNew(true);
     setActiveSection('basic');
   };
 
+  const togglePlatform = (platform: MessagePlatform) => {
+    if (!editingAgent) return;
+    const channels = editingAgent.connectedChannels || [];
+    if (channels.includes(platform)) {
+      setEditingAgent({ ...editingAgent, connectedChannels: channels.filter(p => p !== platform) });
+    } else {
+      setEditingAgent({ ...editingAgent, connectedChannels: [...channels, platform] });
+    }
+  };
+
+  const generateAgentDocId = (platforms: MessagePlatform[]): string => {
+    const order: MessagePlatform[] = ['whatsapp', 'instagram', 'messenger'];
+    return platforms.sort((a, b) => order.indexOf(a) - order.indexOf(b)).join('-');
+  };
+
+  const PLATFORM_OPTIONS: { value: MessagePlatform; label: string }[] = [
+    { value: 'whatsapp', label: 'WhatsApp' },
+    { value: 'instagram', label: 'Instagram' },
+    { value: 'messenger', label: 'Messenger' },
+  ];
+
   const handleSave = async () => {
     if (!editingAgent || !user?.teamId) return;
+    const platforms = editingAgent.connectedChannels || [];
+    if (platforms.length === 0) {
+      alert('Selecciona al menos una plataforma para el agente.');
+      setActiveSection('basic');
+      return;
+    }
     const now = new Date().toISOString();
     try {
       if (isNew) {
-        await createAIAgent(user.teamId, { ...editingAgent, teamId: user.teamId, createdAt: now, updatedAt: now });
+        const docId = generateAgentDocId([...platforms]);
+        await createAIAgent(user.teamId, { ...editingAgent, teamId: user.teamId, createdAt: now, updatedAt: now }, docId);
       } else {
         const { id: _id, ...dataWithoutId } = editingAgent;
         await updateAIAgent(user.teamId, editingAgent.id, { ...dataWithoutId, updatedAt: now });
@@ -243,6 +273,16 @@ export default function AIAgentsPage() {
                 </button>
               </div>
               <p className="text-xs text-surface-500 dark:text-surface-400 mb-2 line-clamp-2">{agent.systemPrompt || 'Sin instrucciones configuradas'}</p>
+              {(agent.connectedChannels || []).length > 0 && (
+                <div className="flex items-center gap-2 mb-2">
+                  {(agent.connectedChannels || []).map(ch => (
+                    <span key={ch} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-surface-100 dark:bg-surface-700 text-xs text-surface-600 dark:text-surface-300">
+                      <PlatformIcon platform={ch} size={12} />
+                      {ch === 'whatsapp' ? 'WhatsApp' : ch === 'instagram' ? 'Instagram' : 'Messenger'}
+                    </span>
+                  ))}
+                </div>
+              )}
               <div className="flex items-center gap-3 text-xs text-surface-400 mb-2">
                 <span className="flex items-center gap-1"><Database size={12} /> {getAgentKBNames(agent)}</span>
               </div>
@@ -251,7 +291,7 @@ export default function AIAgentsPage() {
                 <span className={classNames('px-2 py-0.5 rounded-full', agent.isActive ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400' : 'bg-surface-100 dark:bg-surface-700')}>{agent.isActive ? 'Activo' : 'Inactivo'}</span>
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => { setEditingAgent({ ...agent, knowledgeBaseIds: agent.knowledgeBaseIds || [], provider: agent.provider || 'openai', model: agent.model || '', apiKey: agent.apiKey || '', baseUrl: agent.baseUrl || '' }); setIsNew(false); setActiveSection('basic'); }} className="btn-secondary text-xs py-1.5 flex items-center gap-1"><Edit3 size={12} /> Editar</button>
+                <button onClick={() => { setEditingAgent({ ...agent, knowledgeBaseIds: agent.knowledgeBaseIds || [], connectedChannels: agent.connectedChannels || [], provider: agent.provider || 'openai', model: agent.model || '', apiKey: agent.apiKey || '', baseUrl: agent.baseUrl || '' }); setIsNew(false); setActiveSection('basic'); }} className="btn-secondary text-xs py-1.5 flex items-center gap-1"><Edit3 size={12} /> Editar</button>
                 <button onClick={() => startTest(agent)} className="btn-secondary text-xs py-1.5 flex items-center gap-1"><MessageSquare size={12} /> Probar</button>
                 <button onClick={() => handleDelete(agent.id)} className="btn-ghost text-xs py-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-1"><Trash2 size={12} /> Eliminar</button>
               </div>
@@ -294,6 +334,54 @@ export default function AIAgentsPage() {
             <div className="flex-1 overflow-y-auto p-5 space-y-5">
               {activeSection === 'basic' && (
                 <>
+                  {/* Platform selection */}
+                  <div>
+                    <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Plataformas asignadas</label>
+                    <p className="text-xs text-surface-400 mb-3">Selecciona en qué plataformas atenderá este agente. El identificador del agente se generará según las plataformas seleccionadas.</p>
+                    <div className="grid grid-cols-3 gap-3">
+                      {PLATFORM_OPTIONS.map(opt => {
+                        const isSelected = (editingAgent.connectedChannels || []).includes(opt.value);
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => !(!isNew && agents.some(a => a.id === editingAgent.id)) ? togglePlatform(opt.value) : togglePlatform(opt.value)}
+                            disabled={!isNew}
+                            className={classNames(
+                              'flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all duration-200',
+                              isSelected
+                                ? 'border-primary-400 dark:border-primary-500 bg-primary-50 dark:bg-primary-900/20 shadow-sm'
+                                : 'border-surface-200 dark:border-surface-700 hover:border-surface-300 dark:hover:border-surface-600',
+                              !isNew ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
+                            )}
+                          >
+                            <PlatformIcon platform={opt.value} size={28} />
+                            <span className={classNames(
+                              'text-sm font-medium',
+                              isSelected ? 'text-primary-600 dark:text-primary-400' : 'text-surface-600 dark:text-surface-400'
+                            )}>{opt.label}</span>
+                            {isSelected && (
+                              <div className="w-5 h-5 rounded-full bg-primary-500 flex items-center justify-center">
+                                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {isNew && (editingAgent.connectedChannels || []).length > 0 && (
+                      <div className="mt-3 flex items-center gap-2 px-3 py-2 bg-surface-50 dark:bg-surface-700/50 rounded-lg">
+                        <MessageCircle size={14} className="text-surface-400 flex-shrink-0" />
+                        <p className="text-xs text-surface-500 dark:text-surface-400">
+                          ID del documento: <span className="font-mono font-semibold text-primary-600 dark:text-primary-400">{generateAgentDocId([...(editingAgent.connectedChannels || [])])}</span>
+                        </p>
+                      </div>
+                    )}
+                    {!isNew && (
+                      <p className="text-xs text-surface-400 mt-2">Las plataformas no se pueden cambiar después de crear el agente porque definen su identificador.</p>
+                    )}
+                  </div>
+
                   <div>
                     <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Nombre de tu agente</label>
                     <input type="text" className="input-field" placeholder="Ej: Asistente de Ventas, Soporte 24/7..." value={editingAgent.name} onChange={e => setEditingAgent({ ...editingAgent, name: e.target.value })} />

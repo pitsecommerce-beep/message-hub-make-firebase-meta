@@ -246,9 +246,18 @@ export async function getAIAgents(teamId: string): Promise<AIAgent[]> {
   }
 }
 
-export async function createAIAgent(teamId: string, data: Omit<AIAgent, 'id'>): Promise<string> {
+export async function createAIAgent(teamId: string, data: Omit<AIAgent, 'id'>, customId?: string): Promise<string> {
   try {
     const { id: _stripId, ...cleanData } = data as Record<string, unknown>;
+    if (customId) {
+      const docRef = doc(db, 'teams', teamId, 'aiAgents', customId);
+      const existingDoc = await getDoc(docRef);
+      if (existingDoc.exists()) {
+        throw { code: 'already-exists' };
+      }
+      await setDoc(docRef, stripUndefined(cleanData));
+      return customId;
+    }
     const ref = await addDoc(teamCollection(teamId, 'aiAgents'), stripUndefined(cleanData));
     return ref.id;
   } catch (error) {
