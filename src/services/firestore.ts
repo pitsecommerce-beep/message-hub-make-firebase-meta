@@ -419,6 +419,29 @@ export async function deleteKnowledgeBase(teamId: string, id: string) {
   }
 }
 
+export async function queryKnowledgeBaseRecords(
+  teamId: string,
+  collectionName: string,
+  filters: Record<string, string>,
+  limit_count = 10
+): Promise<Record<string, unknown>[]> {
+  try {
+    const constraints: QueryConstraint[] = [];
+    for (const [field, value] of Object.entries(filters)) {
+      if (value) {
+        constraints.push(where(field, '==', value.toUpperCase()));
+      }
+    }
+    const q = constraints.length > 0
+      ? query(teamCollection(teamId, collectionName), ...constraints)
+      : query(teamCollection(teamId, collectionName));
+    const snap = await getDocs(q);
+    return snap.docs.slice(0, limit_count).map(d => ({ id: d.id, ...d.data() }));
+  } catch (error) {
+    handleFirestoreError(error, 'consultar la base de datos');
+  }
+}
+
 export async function deleteKnowledgeBaseData(teamId: string, collectionName: string) {
   try {
     const snap = await getDocs(teamCollection(teamId, collectionName));

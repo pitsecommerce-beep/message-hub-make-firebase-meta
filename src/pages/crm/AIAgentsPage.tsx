@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Bot, Plus, Power, PowerOff, Edit3, Trash2, MessageSquare, Save, X, Send, Loader2, ChevronRight, Sparkles, Database, Clock, MessageCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { getAIAgents, createAIAgent, updateAIAgent, deleteAIAgent, getKnowledgeBases } from '@/services/firestore';
+import { getAIAgents, createAIAgent, updateAIAgent, deleteAIAgent, getKnowledgeBases, queryKnowledgeBaseRecords } from '@/services/firestore';
 import { classNames } from '@/utils/helpers';
 import PageHeader from '@/components/shared/PageHeader';
 import type { AIAgent, AIProviderType, KnowledgeBase, MessagePlatform } from '@/types';
@@ -143,6 +143,46 @@ export default function AIAgentsPage() {
     setTestInput('');
   };
 
+  const getAgentKnowledgeBases = (agent: AIAgent) => {
+    const ids = agent.knowledgeBaseIds || [];
+    return knowledgeBases.filter(kb => ids.includes(kb.id));
+  };
+
+  const buildQueryDatabaseTool = (kbs: KnowledgeBase[]) => {
+    const allHeaders = [...new Set(kbs.flatMap(kb => kb.headers))];
+    const properties: Record<string, { type: string; description: string }> = {};
+    allHeaders.forEach(h => {
+      properties[h] = { type: 'string', description: `Filtrar por ${h}` };
+    });
+    return {
+      name: 'query_database',
+      description: 'Busca productos o registros en la base de datos de inventario. Usa los filtros disponibles para encontrar piezas específicas. Los valores se comparan en mayúsculas.',
+      parameters: {
+        type: 'object' as const,
+        properties,
+        required: [] as string[],
+      },
+    };
+  };
+
+  const executeQueryDatabase = async (args: Record<string, string>, kbs: KnowledgeBase[]) => {
+    if (!user?.teamId) return [];
+    const results: Record<string, unknown>[] = [];
+    for (const kb of kbs) {
+      const relevantFilters: Record<string, string> = {};
+      for (const [key, val] of Object.entries(args)) {
+        if (val && kb.headers.includes(key)) {
+          relevantFilters[key] = val;
+        }
+      }
+      if (Object.keys(relevantFilters).length > 0 || Object.keys(args).length === 0) {
+        const records = await queryKnowledgeBaseRecords(user.teamId, kb.collectionName, relevantFilters, 10);
+        results.push(...records);
+      }
+    }
+    return results;
+  };
+
   const sendTestMessage = async () => {
     if (!testInput.trim() || !testingAgent) return;
     const userMsg = testInput.trim();
@@ -156,55 +196,138 @@ export default function AIAgentsPage() {
       return;
     }
 
-    try {
-      let apiUrl = '';
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      let body: Record<string, unknown> = {};
+    const agentKBs = getAgentKnowledgeBases(testingAgent);
+    const hasKBs = agentKBs.length > 0;
 
+    try {
       if (testingAgent.provider === 'openai' || testingAgent.provider === 'custom') {
-        apiUrl = testingAgent.baseUrl ? `${testingAgent.baseUrl}/chat/completions` : 'https://api.openai.com/v1/chat/completions';
-        headers['Authorization'] = `Bearer ${testingAgent.apiKey}`;
-        body = {
-          model: testingAgent.model || 'gpt-4o-mini',
-          messages: [
-            { role: 'system', content: testingAgent.systemPrompt || 'Eres un asistente útil.' },
-            ...testMessages.map(m => ({ role: m.role, content: m.content })),
-            { role: 'user', content: userMsg },
-          ],
-          max_tokens: testingAgent.maxTokens,
-          temperature: testingAgent.temperature,
-        };
+        await sendTestOpenAI(testingAgent, userMsg, agentKBs, hasKBs);
       } else if (testingAgent.provider === 'anthropic') {
-        apiUrl = 'https://api.anthropic.com/v1/messages';
-        headers['x-api-key'] = testingAgent.apiKey;
-        headers['anthropic-version'] = '2023-06-01';
-        headers['anthropic-dangerous-direct-browser-access'] = 'true';
-        body = {
-          model: testingAgent.model || 'claude-sonnet-4-20250514',
-          system: testingAgent.systemPrompt || 'Eres un asistente útil.',
-          messages: [
-            ...testMessages.map(m => ({ role: m.role, content: m.content })),
-            { role: 'user', content: userMsg },
-          ],
-          max_tokens: testingAgent.maxTokens,
-        };
+        await sendTestAnthropic(testingAgent, userMsg, agentKBs, hasKBs);
+      }
+    } catch (err) {
+      setTestMessages(prev => [...prev, { role: 'assistant', content: `Error: ${err instanceof Error ? err.message : 'No se pudo conectar con el proveedor de IA'}` }]);
+    }
+    setTestLoading(false);
+  };
+
+  const sendTestOpenAI = async (agent: AIAgent, userMsg: string, kbs: KnowledgeBase[], hasKBs: boolean) => {
+    const apiUrl = agent.baseUrl ? `${agent.baseUrl}/chat/completions` : 'https://api.openai.com/v1/chat/completions';
+    const headers: Record<string, string> = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${agent.apiKey}` };
+    const tool = hasKBs ? buildQueryDatabaseTool(kbs) : null;
+
+    const messages: Record<string, unknown>[] = [
+      { role: 'system', content: agent.systemPrompt || 'Eres un asistente útil.' },
+      ...testMessages.map(m => ({ role: m.role, content: m.content })),
+      { role: 'user', content: userMsg },
+    ];
+
+    let attempts = 0;
+    while (attempts < 5) {
+      attempts++;
+      const body: Record<string, unknown> = {
+        model: agent.model || 'gpt-4o-mini',
+        messages,
+        max_tokens: agent.maxTokens,
+        temperature: agent.temperature,
+      };
+      if (tool) {
+        body.tools = [{ type: 'function', function: tool }];
+      }
+
+      const resp = await fetch(apiUrl, { method: 'POST', headers, body: JSON.stringify(body) });
+      const data = await resp.json();
+      const choice = data.choices?.[0];
+
+      if (!choice) {
+        setTestMessages(prev => [...prev, { role: 'assistant', content: data.error?.message || 'Sin respuesta' }]);
+        return;
+      }
+
+      if (choice.finish_reason === 'tool_calls' && choice.message?.tool_calls) {
+        messages.push(choice.message);
+        for (const tc of choice.message.tool_calls) {
+          if (tc.function?.name === 'query_database') {
+            const args = JSON.parse(tc.function.arguments || '{}');
+            const results = await executeQueryDatabase(args, kbs);
+            messages.push({
+              role: 'tool',
+              tool_call_id: tc.id,
+              content: JSON.stringify(results),
+            });
+          }
+        }
+        continue;
+      }
+
+      setTestMessages(prev => [...prev, { role: 'assistant', content: choice.message?.content || 'Sin respuesta' }]);
+      return;
+    }
+    setTestMessages(prev => [...prev, { role: 'assistant', content: 'Se alcanzó el límite de consultas a la base de datos.' }]);
+  };
+
+  const sendTestAnthropic = async (agent: AIAgent, userMsg: string, kbs: KnowledgeBase[], hasKBs: boolean) => {
+    const apiUrl = 'https://api.anthropic.com/v1/messages';
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'x-api-key': agent.apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    };
+    const tool = hasKBs ? buildQueryDatabaseTool(kbs) : null;
+
+    const messages: Record<string, unknown>[] = [
+      ...testMessages.map(m => ({ role: m.role, content: m.content })),
+      { role: 'user', content: userMsg },
+    ];
+
+    let attempts = 0;
+    while (attempts < 5) {
+      attempts++;
+      const body: Record<string, unknown> = {
+        model: agent.model || 'claude-sonnet-4-20250514',
+        system: agent.systemPrompt || 'Eres un asistente útil.',
+        messages,
+        max_tokens: agent.maxTokens,
+      };
+      if (tool) {
+        body.tools = [{
+          name: tool.name,
+          description: tool.description,
+          input_schema: tool.parameters,
+        }];
       }
 
       const resp = await fetch(apiUrl, { method: 'POST', headers, body: JSON.stringify(body) });
       const data = await resp.json();
 
-      let reply = '';
-      if (testingAgent.provider === 'anthropic') {
-        reply = data.content?.[0]?.text || data.error?.message || 'Sin respuesta';
-      } else {
-        reply = data.choices?.[0]?.message?.content || data.error?.message || 'Sin respuesta';
+      if (data.error) {
+        setTestMessages(prev => [...prev, { role: 'assistant', content: data.error.message || 'Error del proveedor' }]);
+        return;
       }
 
-      setTestMessages(prev => [...prev, { role: 'assistant', content: reply }]);
-    } catch (err) {
-      setTestMessages(prev => [...prev, { role: 'assistant', content: `Error: ${err instanceof Error ? err.message : 'No se pudo conectar con el proveedor de IA'}` }]);
+      if (data.stop_reason === 'tool_use') {
+        messages.push({ role: 'assistant', content: data.content });
+        const toolResults: Record<string, unknown>[] = [];
+        for (const block of data.content) {
+          if (block.type === 'tool_use' && block.name === 'query_database') {
+            const results = await executeQueryDatabase(block.input || {}, kbs);
+            toolResults.push({
+              type: 'tool_result',
+              tool_use_id: block.id,
+              content: JSON.stringify(results),
+            });
+          }
+        }
+        messages.push({ role: 'user', content: toolResults });
+        continue;
+      }
+
+      const textBlock = data.content?.find((b: { type: string }) => b.type === 'text');
+      setTestMessages(prev => [...prev, { role: 'assistant', content: textBlock?.text || 'Sin respuesta' }]);
+      return;
     }
-    setTestLoading(false);
+    setTestMessages(prev => [...prev, { role: 'assistant', content: 'Se alcanzó el límite de consultas a la base de datos.' }]);
   };
 
   const getCreativityLabel = (temp: number) => {
