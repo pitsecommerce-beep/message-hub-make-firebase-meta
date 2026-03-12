@@ -216,8 +216,12 @@ export default function AIAgentsPage() {
     const headers: Record<string, string> = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${agent.apiKey}` };
     const tool = hasKBs ? buildQueryDatabaseTool(kbs) : null;
 
+    const systemPrompt = hasKBs
+      ? `${agent.systemPrompt || 'Eres un asistente útil.'}\n\nIMPORTANTE: Tienes acceso a la herramienta query_database para consultar el inventario real. SIEMPRE debes llamar a query_database ANTES de responder cualquier pregunta sobre productos, piezas, disponibilidad o precios. NUNCA digas "déjame buscar" o "voy a consultar" — simplemente llama a la herramienta directamente. No inventes datos; solo responde con los resultados reales de la herramienta.`
+      : (agent.systemPrompt || 'Eres un asistente útil.');
+
     const messages: Record<string, unknown>[] = [
-      { role: 'system', content: agent.systemPrompt || 'Eres un asistente útil.' },
+      { role: 'system', content: systemPrompt },
       ...testMessages.map(m => ({ role: m.role, content: m.content })),
       { role: 'user', content: userMsg },
     ];
@@ -233,6 +237,7 @@ export default function AIAgentsPage() {
       };
       if (tool) {
         body.tools = [{ type: 'function', function: tool }];
+        body.tool_choice = 'auto';
       }
 
       const resp = await fetch(apiUrl, { method: 'POST', headers, body: JSON.stringify(body) });
@@ -276,6 +281,10 @@ export default function AIAgentsPage() {
     };
     const tool = hasKBs ? buildQueryDatabaseTool(kbs) : null;
 
+    const systemPrompt = hasKBs
+      ? `${agent.systemPrompt || 'Eres un asistente útil.'}\n\nIMPORTANTE: Tienes acceso a la herramienta query_database para consultar el inventario real. SIEMPRE debes llamar a query_database ANTES de responder cualquier pregunta sobre productos, piezas, disponibilidad o precios. NUNCA digas "déjame buscar" o "voy a consultar" — simplemente llama a la herramienta directamente. No inventes datos; solo responde con los resultados reales de la herramienta.`
+      : (agent.systemPrompt || 'Eres un asistente útil.');
+
     const messages: Record<string, unknown>[] = [
       ...testMessages.map(m => ({ role: m.role, content: m.content })),
       { role: 'user', content: userMsg },
@@ -286,7 +295,7 @@ export default function AIAgentsPage() {
       attempts++;
       const body: Record<string, unknown> = {
         model: agent.model || 'claude-sonnet-4-20250514',
-        system: agent.systemPrompt || 'Eres un asistente útil.',
+        system: systemPrompt,
         messages,
         max_tokens: agent.maxTokens,
       };
@@ -296,6 +305,7 @@ export default function AIAgentsPage() {
           description: tool.description,
           input_schema: tool.parameters,
         }];
+        body.tool_choice = { type: 'auto' };
       }
 
       const resp = await fetch(apiUrl, { method: 'POST', headers, body: JSON.stringify(body) });
